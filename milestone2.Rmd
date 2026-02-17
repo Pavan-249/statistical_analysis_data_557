@@ -217,7 +217,7 @@ cat("Female mean yrdeg:", female_mean, "\n")
 cat("Difference in means (M - F):", male_mean - female_mean, "\n")
 ```
 
-```{r hd6, include = TRUE}
+```{r hd6, include = TRUE, fig.show = "hide"}
 bins <- seq(min(df1$yrdeg), max(df1$yrdeg) + 2, by = 2)
 
 ggplot(df1, aes(x = yrdeg)) +
@@ -247,7 +247,7 @@ ggplot(data.frame(yrdeg = female), aes(x = yrdeg)) +
   )
 ```
 
-```{r hd7, include = TRUE}
+```{r hd7, include = TRUE, fig.show = "hide"}
 df1 %>%
   group_by(sex) %>%
   summarise(
@@ -289,7 +289,9 @@ df %>%
     std   = sd(year_hired, na.rm = TRUE)
   )
 
-c(count = length(df$year_hired), mean = mean(df$year_hired, na.rm = TRUE), std = sd(df$year_hired, na.rm = TRUE))
+c(count = length(df$year_hired), mean = mean(df$year_hired, 
+                                             na.rm = TRUE), 
+  std = sd(df$year_hired, na.rm = TRUE))
 
 cat("Overall\n") 
 print(summary(df$year_hired)) 
@@ -298,7 +300,7 @@ cat("\nBy sex\n")
 print(by(df$year_hired, df$sex, summary))
 ```
 
-```{r yh2, include = TRUE, fig.width=6, fig.height=6}
+```{r yh2, include = TRUE, fig.width=6, fig.height=6, fig.show = "hide"}
 rng <- range(df$year_hired, na.rm = TRUE)
 breaks <- seq(rng[1], rng[2], length.out = 21)   
 
@@ -357,52 +359,131 @@ boxplot(year_hired ~ sex,
 # Academic Rank in 1995
 ```{r ar1, include = TRUE}
 df <- read.table("salary.txt", header = TRUE)
-df95 <- subset(df, year == 95)
-df95$rank <- factor(df95$rank, levels = c("Assist", "Assoc", "Full"))
-df95$sex <- factor(df95$sex)
+head(df, 5)
+df_95 <- df %>% filter(year == 95)
 
-rank_counts <- table(df95$rank)
-rank_props <- prop.table(rank_counts)
+cat("Number of faculty in 1995:", nrow(df_95), "\n")
 
-data.frame(
-  rank = names(rank_counts),
-  count = as.integer(rank_counts),
-  proportion = as.numeric(rank_props)
+rank_counts <- sort(table(df_95$rank))
+rank_percent <- prop.table(table(df_95$rank)) * 100
+rank_percent <- rank_percent[names(rank_counts)]
+
+rank_summary <- data.frame(
+  Count = as.integer(rank_counts),
+  Percentage = round(as.numeric(rank_percent), 2),
+  row.names = names(rank_counts)
 )
 
-rank_by_sex <- table(df95$sex, df95$rank)
-rank_by_sex
+cat("\nAcademic Rank Distribution (1995):\n")
+print(rank_summary)
 
-rank_by_sex_prop <- prop.table(rank_by_sex, margin = 1)
-round(rank_by_sex_prop, 3)
+rank_sex_table <- table(df_95$rank, df_95$sex)
+rank_sex_percent <- prop.table(rank_sex_table, margin = 2) * 100
+
+cat("\nRank by Sex (Counts):\n")
+print(rank_sex_table)
+
+cat("\nRank by Sex (Percentage within Sex):\n")
+print(round(rank_sex_percent, 2))
 ```
 
-```{r ar2, include = TRUE, fig.width=6, fig.height=6}
+```{r ar2, include = TRUE, fig.width=6, fig.height=6, fig.show = "hide"}
 barplot(rank_counts,
         main = "Academic Rank Distribution (1995)",
         xlab = "Rank",
         ylab = "Count")
 
-text(seq_along(rank_counts),
-     rank_counts,
-     labels = rank_counts,
-     pos = 3)
-
-barplot(rank_by_sex,
+barplot(t(rank_sex_percent),
         beside = TRUE,
-        col = c("#1f77b4", "#ff7f0e"),
-        main = "Academic Rank by Sex (1995)",
-        xlab = "Rank",
-        ylab = "Count",
-        legend.text = rownames(rank_by_sex))
+        legend.text = TRUE,
+        main = "Academic Rank by Sex (Percentage within Sex)",
+        xlab = "Sex",
+        ylab = "Percentage")
 
-barplot(rank_by_sex_prop,
-        beside = TRUE,
-        col = c("#1f77b4", "#ff7f0e"),
-        main = "Proportion of Ranks by Sex (1995)",
-        xlab = "Rank",
-        ylab = "Proportion",
-        legend.text = rownames(rank_by_sex_prop))
+field_counts <- sort(table(df_95$field), decreasing = TRUE)
+field_percent <- prop.table(table(df_95$field)) * 100
+field_percent <- field_percent[names(field_counts)]
+
+cat("\nAcademic Field Distribution (1995):\n")
+print(data.frame(
+  Count = as.integer(field_counts),
+  Percentage = round(as.numeric(field_percent), 2),
+  row.names = names(field_counts)
+))
+
+prop.table(table(df_95$field, df_95$sex), margin = 2) * 100
+
+plt_field_counts <- sort(table(df_95$field), decreasing = TRUE)
+barplot(plt_field_counts,
+        main = "Academic Field Distribution (1995)",
+        xlab = "Field",
+        ylab = "Count")
+
+cat("\nYear Highest Degree Summary:\n")
+print(summary(df_95$yrdeg))
+
+breaks_yrdeg <- seq(min(df_95$yrdeg, na.rm = TRUE),
+                    max(df_95$yrdeg, na.rm = TRUE),
+                    length.out = 16) 
+
+hist(df_95$yrdeg,
+     breaks = breaks_yrdeg,
+     col = "#4C72B0",
+     border = "white",
+     main = "Distribution of Year Highest Degree Attained",
+     xlab = "Year",
+     ylab = "Frequency")
+grid()
+
+cat("\nStart Year Summary:\n")
+print(summary(df_95$startyr))
+
+breaks_startyr <- seq(min(df_95$startyr, na.rm = TRUE),
+                      max(df_95$startyr, na.rm = TRUE),
+                      length.out = 16)
+
+hist(df_95$startyr,
+     breaks = breaks_startyr,
+     col = "#4C72B0",
+     border = "white",
+     main = "Distribution of Year Hired",
+     xlab = "Start Year",
+     ylab = "Frequency")
+grid()
+
+
+cat("\nSalary Summary (1995):\n")
+print(summary(df_95$salary))
+
+breaks_salary <- seq(min(df_95$salary, na.rm = TRUE),
+                     max(df_95$salary, na.rm = TRUE),
+                     length.out = 21)
+
+hist(df_95$salary,
+     breaks = breaks_salary,
+     col = "#4C72B0",
+     border = "white",
+     main = "Salary Distribution (1995)",
+     xlab = "Monthly Salary",
+     ylab = "Frequency")
+grid()
+
+cat("\nSalary by Sex:\n")
+print(df_95 %>% group_by(sex) %>% summarise(
+  count = n(),
+  mean = mean(salary, na.rm = TRUE),
+  sd = sd(salary, na.rm = TRUE),
+  min = min(salary, na.rm = TRUE),
+  `25%` = quantile(salary, 0.25, na.rm = TRUE),
+  `50%` = quantile(salary, 0.50, na.rm = TRUE),
+  `75%` = quantile(salary, 0.75, na.rm = TRUE),
+  max = max(salary, na.rm = TRUE)
+))
+
+boxplot(salary ~ sex, data = df_95,
+        main = "Salary by Sex (1995)",
+        xlab = "Sex",
+        ylab = "Salary")
 ```
 
 # Monthly Salary in 1995
@@ -432,7 +513,7 @@ df %>%
     )
 ```
 
-```{r ms2, include = TRUE}
+```{r ms2, include = TRUE, fig.show = "hide"}
 ggplot(df, aes(x = salary)) +
   geom_histogram(bins = 30) +
   theme_gray() +
