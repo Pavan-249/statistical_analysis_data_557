@@ -356,6 +356,14 @@ boxplot(year_hired ~ sex,
         ylab = "")
 ```
 
+```{r yh3, include = TRUE}
+df$sex <- as.factor(df$sex)
+
+welch_hire <- t.test(year_hired ~ sex, data = df, var.equal = FALSE)
+
+welch_hire
+```
+
 # Academic Rank in 1995
 ```{r ar1, include = TRUE}
 df <- read.table("salary.txt", header = TRUE)
@@ -486,9 +494,16 @@ boxplot(salary ~ sex, data = df_95,
         ylab = "Salary")
 ```
 
+```{r ar3, include = TRUE}
+df_95 <- subset(df, year == 95)
+
+chisq.test(table(df_95$rank, df_95$sex))
+```
+
 # Monthly Salary in 1995
 ```{r ms1, include = TRUE}
 df <- read.table("salary.txt", header = TRUE, sep = "")
+df <- df %>% filter(year == 95)
 head(df)
 
 missing_counts_by_group <- df %>%
@@ -541,9 +556,13 @@ ggplot(df, aes(x = sex, y = salary)) +
     x = "Sex",
     y = "Salary"
     )
+```
 
-ggplot(df, aes(x = sex, y = salary)) +
-  geom_boxplot(outlier.shape = NA) +
-  coord_cartesian(ylim = c(0, 7500)) # Zoom in to see the boxes clearly
+```{r ms3, include = TRUE}
+df_95 <- subset(df, year == 95)
+
+welch_salary <- t.test(salary ~ sex, data = df_95, var.equal = FALSE)
+
+welch_salary
 ```
 
