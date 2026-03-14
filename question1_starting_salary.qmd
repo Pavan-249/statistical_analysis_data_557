@@ -36,7 +36,7 @@ df <- read.table("salary.txt", header = TRUE, strip.white = TRUE)
 df$sex   <- factor(df$sex,   levels = c("M", "F"))
 df$field <- factor(df$field)
 
-cat("After startyr == year filter:", nrow(df), "rows\n")
+cat("Total number of rows: ", nrow(df), "rows\n")
 ```
 
 
