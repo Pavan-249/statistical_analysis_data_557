@@ -1,0 +1,375 @@
+---
+title: "Final Project Code Appendix"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+## 0. Imports and Load Packages
+```{r, warning=FALSE, message=FALSE}
+library(tidyverse)
+library(lmtest)
+library(sandwich)
+library(scales)
+```
+
+## 1. Read and clean data
+```{r}
+salary <- read.table(
+  "salary.txt",
+  header = TRUE,
+  sep = "",
+  stringsAsFactors = FALSE,
+  na.strings = "NA"
+)
+
+salary <- salary %>%
+  mutate(
+    sex = factor(sex, levels = c("M", "F")),
+    deg = factor(deg),
+    field = factor(field),
+    rank = factor(rank, levels = c("Assist", "Assoc", "Full")),
+    admin = factor(admin, levels = c(0, 1)),
+    startyr = as.integer(startyr),
+    year = as.integer(year),
+    yrdeg = as.integer(yrdeg),
+    salary = as.numeric(salary),
+    experience = year - startyr
+  )
+
+# checks for problematic values (ensured no negative experience)
+# salary %>%
+  # filter(experience < 0) %>%
+  # print()
+
+salary_clean <- salary %>%
+  filter(experience >= 0, !is.na(rank))
+```
+
+## 2. Descriptive summaries
+```{r}
+salary_clean %>%
+  count(sex, rank, field)
+
+salary_clean %>%
+  summarise(
+    n_records = n(),
+    n_people = n_distinct(id),
+    min_year = min(year, na.rm = TRUE),
+    max_year = max(year, na.rm = TRUE)
+  ) %>%
+  print()
+```
+
+## 3. Q1: Starting salary discrimination
+```{r}
+start_salary <- salary_clean %>%
+  filter(year == startyr)
+
+start_salary %>%
+  summarise(
+    n_records = n(),
+    n_people = n_distinct(id)
+  ) %>%
+  print()
+
+cat("\nRank distribution at hire:\n")
+start_salary %>%
+  count(rank, sex) %>%
+  arrange(rank, sex)
+
+cat("\nStarting salary summaries by sex:\n")
+q1_summary <- start_salary %>%
+  group_by(sex) %>%
+  summarise(
+    n = n(),
+    mean_salary = mean(salary, na.rm = TRUE),
+    median_salary = median(salary, na.rm = TRUE),
+    sd_salary = sd(salary, na.rm = TRUE),
+    iqr_salary = IQR(salary, na.rm = TRUE)
+  )
+print(q1_summary)
+
+cat("\nStarting salary summaries by sex and field:\n")
+start_salary %>%
+  group_by(field, sex) %>%
+  summarise(
+    n = n(),
+    mean_salary = mean(salary, na.rm = TRUE),
+    median_salary = median(salary, na.rm = TRUE),
+    .groups = "drop"
+  )
+```
+```{r}
+par(mfrow = c(1, 2))
+hist(start_salary$salary, main = "Starting Salary Histogram", xlab = "Salary")
+qqnorm(start_salary$salary, main = "Q-Q Plot: Starting Salary")
+qqline(start_salary$salary, col = "red")
+par(mfrow = c(1, 1))
+
+ggplot(start_salary, aes(x = salary, fill = sex)) +
+  geom_histogram(alpha = 0.6, bins = 25, position = "identity") +
+  facet_wrap(~ sex, scales = "free_y") +
+  labs(
+    title = "Starting Salary Distribution by Sex",
+    x = "Starting Salary",
+    y = "Count"
+  )
+
+ggplot(start_salary, aes(x = sex, y = salary, fill = sex)) +
+  geom_boxplot(alpha = 0.8) +
+  labs(
+    title = "Starting Salary by Sex",
+    x = "Sex",
+    y = "Starting Salary"
+  )
+
+ggplot(start_salary, aes(x = factor(startyr), y = salary, fill = sex)) +
+  geom_boxplot(outlier.alpha = 0.3) +
+  labs(
+    title = "Starting Salary by Hire Year and Sex",
+    x = "Hire Year",
+    y = "Starting Salary"
+  ) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+cat("\nQ1 Welch two-sample t-test:\n")
+q1_ttest <- t.test(salary ~ sex, data = start_salary)
+print(q1_ttest)
+
+q1_lm <- lm(salary ~ sex + field + yrdeg + startyr, data = start_salary)
+cat("\nQ1 linear regression on raw salary:\n")
+summary(q1_lm)
+```
+
+```{r}
+par(mfrow = c(2, 2))
+plot(q1_lm)
+par(mfrow = c(1, 1))
+
+cat("\nQ1 regression with heteroskedasticity-robust SE:\n")
+coeftest(q1_lm, vcov = vcovHC(q1_lm, type = "HC1"))
+
+# Log salary model
+start_salary <- start_salary %>%
+  mutate(log_salary = log(salary))
+
+q1_lm_log <- lm(log_salary ~ sex + field + yrdeg + startyr, data = start_salary)
+cat("\nQ1 linear regression on log salary:\n")
+summary(q1_lm_log)
+
+cat("\nQ1 log-salary regression with robust SE:\n")
+coeftest(q1_lm_log, vcov = vcovHC(q1_lm_log, type = "HC1"))
+
+q1_log_coef <- coef(q1_lm_log)["sexF"]
+cat("\nApproximate percent difference for women in starting salary:\n")
+cat(round((exp(q1_log_coef) - 1) * 100, 2), "%\n")
+```
+
+
+## 4. Q2: Wage difference at promotion
+```{r}
+promotion_data <- salary_clean %>%
+  arrange(id, year) %>%
+  group_by(id) %>%
+  mutate(
+    prev_rank = lag(rank),
+    prev_salary = lag(salary),
+    prev_year = lag(year)
+  ) %>%
+  ungroup() %>%
+  filter(prev_rank == "Assoc", rank == "Full")
+
+promotion_data %>%
+  summarise(
+    n_promotions = n(),
+    n_people = n_distinct(id)
+  ) %>%
+  print()
+
+promotion_data <- promotion_data %>%
+  group_by(id) %>%
+  slice(1) %>%
+  ungroup()
+```
+```{r}
+promotion_data <- promotion_data %>%
+  mutate(
+    raise_amount = salary - prev_salary,
+    raise_pct = (salary - prev_salary) / prev_salary
+  )
+
+cat("\nPromotion raise summaries by sex:\n")
+promotion_data %>%
+  group_by(sex) %>%
+  summarise(
+    n = n(),
+    mean_raise = mean(raise_amount, na.rm = TRUE),
+    median_raise = median(raise_amount, na.rm = TRUE),
+    mean_pct_raise = mean(raise_pct, na.rm = TRUE),
+    median_pct_raise = median(raise_pct, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  print()
+```
+
+```{r}
+ggplot(promotion_data, aes(x = sex, y = raise_amount, fill = sex)) +
+  geom_boxplot(alpha = 0.8) +
+  labs(
+    title = "Salary Increase at Promotion (Associate to Full) by Sex",
+    x = "Sex",
+    y = "Dollar Raise at Promotion"
+  )
+
+ggplot(promotion_data, aes(x = sex, y = raise_pct, fill = sex)) +
+  geom_boxplot(alpha = 0.8) +
+  scale_y_continuous(labels = percent_format(accuracy = 1)) +
+  labs(
+    title = "Percent Raise at Promotion by Sex",
+    x = "Sex",
+    y = "Percent Raise"
+  )
+
+ggplot(promotion_data, aes(x = raise_pct, fill = sex)) +
+  geom_histogram(alpha = 0.6, bins = 20, position = "identity") +
+  facet_wrap(~ sex) +
+  scale_x_continuous(labels = percent_format(accuracy = 1)) +
+  labs(
+    title = "Distribution of Percent Raise at Promotion",
+    x = "Percent Raise",
+    y = "Count"
+  )
+```
+
+```{r}
+cat("\nQ2 Welch t-test for dollar raise:\n")
+print(t.test(raise_amount ~ sex, data = promotion_data))
+
+cat("\nQ2 Welch t-test for percent raise:\n")
+print(t.test(raise_pct ~ sex, data = promotion_data))
+
+cat("\nQ2 Wilcoxon test for percent raise:\n")
+print(wilcox.test(raise_pct ~ sex, data = promotion_data))
+```
+
+```{r}
+q2_lm_raise <- lm(
+  raise_amount ~ sex + field + yrdeg + prev_salary,
+  data = promotion_data
+)
+cat("\nQ2 regression for dollar raise:\n")
+summary(q2_lm_raise)
+
+cat("\nQ2 regression for dollar raise with robust SE:\n")
+coeftest(q2_lm_raise, vcov = vcovHC(q2_lm_raise, type = "HC1"))
+
+q2_lm_pct <- lm(
+  raise_pct ~ sex + field + yrdeg + prev_salary,
+  data = promotion_data
+)
+cat("\nQ2 regression for percent raise:\n")
+summary(q2_lm_pct)
+
+cat("\nQ2 regression for percent raise with robust SE:\n")
+coeftest(q2_lm_pct, vcov = vcovHC(q2_lm_pct, type = "HC1"))
+```
+
+## 5. Q3: Overall salary discrimination
+```{r}
+# avoid longitudinal methods by using one row per faculty (latest salary)
+latest_salary <- salary_clean %>%
+  arrange(id, year) %>%
+  group_by(id) %>%
+  slice_tail(n = 1) %>%
+  ungroup() %>%
+  mutate(
+    log_salary = log(salary),
+    experience = year - startyr
+  )
+
+latest_salary %>%
+  summarise(
+    n_people = n(),
+    min_year = min(year, na.rm = TRUE),
+    max_year = max(year, na.rm = TRUE)
+  ) %>%
+  print()
+```
+
+```{r}
+cat("\nLatest salary summaries by sex and rank:\n")
+latest_salary %>%
+  group_by(rank, sex) %>%
+  summarise(
+    n = n(),
+    mean_salary = mean(salary, na.rm = TRUE),
+    median_salary = median(salary, na.rm = TRUE),
+    sd_salary = sd(salary, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+ggplot(latest_salary, aes(x = sex, y = salary, fill = sex)) +
+  geom_boxplot(alpha = 0.8) +
+  facet_wrap(~ rank, scales = "free_y") +
+  labs(
+    title = "Latest Salary by Sex Within Rank",
+    x = "Sex",
+    y = "Salary"
+  )
+
+ggplot(latest_salary, aes(x = salary, fill = sex)) +
+  geom_density(alpha = 0.4) +
+  facet_wrap(~ rank, scales = "free") +
+  labs(
+    title = "Latest Salary Density by Sex Within Rank",
+    x = "Salary",
+    y = "Density"
+  )
+```
+
+```{r}
+q3_lm <- lm(
+  salary ~ sex + rank + field + experience + admin,
+  data = latest_salary
+)
+cat("\nQ3 overall salary model (latest salary):\n")
+summary(q3_lm)
+
+cat("\nQ3 overall salary model with robust SE:\n")
+coeftest(q3_lm, vcov = vcovHC(q3_lm, type = "HC1"))
+
+# interaction model: does the salary gap differ by rank?
+q3_interaction <- lm(
+  salary ~ sex * rank + field + experience + admin,
+  data = latest_salary
+)
+cat("\nQ3 salary model with sex x rank interaction:\n")
+summary(q3_interaction)
+
+cat("\nQ3 interaction model with robust SE:\n")
+coeftest(q3_interaction, vcov = vcovHC(q3_interaction, type = "HC1"))
+
+# log-salary
+q3_lm_log <- lm(
+  log_salary ~ sex + rank + field + experience + admin,
+  data = latest_salary
+)
+cat("\nQ3 log-salary model:\n")
+summary(q3_lm_log)
+
+cat("\nQ3 log-salary model with robust SE:\n")
+coeftest(q3_lm_log, vcov = vcovHC(q3_lm_log, type = "HC1"))
+
+# coefs
+q3_log_coef <- coef(q3_lm_log)["sexF"]
+cat("\nApproximate percent difference for women in latest salary:\n")
+cat(round((exp(q3_log_coef) - 1) * 100, 2), "%\n")
+```
+
+
+
+
+

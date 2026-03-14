@@ -35,34 +35,12 @@ library(lmtest)
 df <- read.table("salary.txt", header = TRUE, strip.white = TRUE)
 df$sex   <- factor(df$sex,   levels = c("M", "F"))
 df$field <- factor(df$field)
+
+cat("Total number of rows: ", nrow(df), "rows\n")
 ```
 
-## 2.1 Restrict to starting salary observations
 
-Keep only rows where salary is observed in the year hired. Because the research question only asks about starting salaries, the analysis restricts the dataset to observations where the year = the year each faculty member was hired.
-
-```{r}
-n_before <- nrow(df)
-df <- df[df$startyr == df$year, ]
-cat("After startyr == year filter:", nrow(df), "rows (removed", n_before - nrow(df), "non–hire-year rows)\n")
-```
-
-## 2.2 Verify rank at hire
-
-Summary of `rank` at hire (as suggested in feedback): we check that rank is uniform or document its distribution before analysis.
-
-```{r}
-df$rank <- factor(df$rank)
-table(df$rank)
-```
-
-The table above shows the distribution of rank at hire; we use it to verify that rank is (or is not) uniform at hire before analysis.
-
-## 2.3 Distribution of starting salary and transformation
-
-We check the distribution of starting salary in Section 3 (boxplots and histograms). If the distribution is right-skewed, we use $\log(\text{salary})$ in regression (Section 4.3) to improve normality and interpret the sex coefficient as an approximate percentage difference. The descriptive plots in Section 3 support using a log transformation.
-
-## 2.4 Final Dataset
+## 2.6 Final Dataset
 
 ```{r}
 cat("Final dataset:", nrow(df), "faculty members\n")
@@ -140,13 +118,10 @@ ggplot(cohort, aes(x = startyr, y = mean_sal, colour = sex)) +
        x = "Year Hired", y = "Mean Monthly Salary ($)", colour = "Sex") +
   theme_minimal()
 ```
-Boxplots and histograms show the female distribution shifted lower than the male distribution (see figures on pages 3–4).The distributions overlap alot, but women earn less on average.
-
+Boxplots and histograms show the female distribution shifted lower than the male distribution (see figures on pages 3–4).
 ---
 
 # 4. Inferential Analysis
-
-To formally test whether average starting salaries differ by sex, a Welch two-sample t-test was conducted.
 
 ## 4.1 Welch Two-Sample t-Test
 
@@ -155,7 +130,7 @@ $H_0: \mu_F = \mu_M$ vs $H_A: \mu_F \neq \mu_M$
 ```{r}
 t.test(salary ~ sex, data = df, alternative = "two.sided")
 ```
-Because the p-value is < 0.05, we reject the null hypothesis of equal means. There is strong statistical evidence that men and women differ in average starting salaries. Although the starting-salary distribution is right-skewed, the sample size is large, so by the central limit theorem the sampling distribution of the mean difference is approximately normal and the Welch t-test is appropriate.
+Because the p-value is < 0.05, we reject the null hypothesis of equal means.
 
 ## 4.2 Multiple Linear Regression (Salary Level)
 
@@ -165,7 +140,7 @@ $$Y_i = \beta_0 + \beta_1\text{Female}_i + \beta_2\text{Field}_i + \beta_3\text{
 ols <- lm(salary ~ sex + field + yrdeg + startyr, data = df)
 coeftest(ols, vcov = vcovHC(ols, type = "HC3"))
 ```
-This means that, holding field, experience, and hiring year constant, women earned about $291 less per month at hire than men.
+This means that, holding those factors constant, women earn about $441 less per month at hire.
 
 ```{r}
 summary(ols)$r.squared
@@ -173,7 +148,7 @@ summary(ols)$r.squared
 
 ## 4.3 Multiple Linear Regression (Log Salary)
 
-Using log(salary) to interpret the sex gap as a percentage difference and to address right skew. While log transformations can in principle distort relationships and make regression assumptions worse, in this dataset the diagnostic plots in Section 5 show that the log-salary model has more nearly constant variance and more symmetric residuals than the normal model, and it leads to the same qualitative conclusion about the gender gap.
+Using log(salary) to interpret the sex gap as a percentage difference and to address right skew.
 
 ```{r}
 log_ols <- lm(log(salary) ~ sex + field + yrdeg + startyr, data = df)
@@ -184,14 +159,13 @@ coeftest(log_ols, vcov = vcovHC(log_ols, type = "HC3"))
 summary(log_ols)$r.squared
 ```
 
-Women earned roughly 7% less than men at hire after adjusting for other variables.
+The `sexF` coefficient from the log model gives the approximate percentage salary difference for women relative to men: `(exp(coef) - 1) * 100`. 
+
 ---
 
 # 5. Diagnostics
 
 ```{r}
-par(mfrow = c(2, 2))
-plot(ols)
 par(mfrow = c(2, 2))
 plot(log_ols)
 par(mfrow = c(1, 1))
@@ -200,8 +174,8 @@ What the analysis DOES show
 
 - A large, statistically significant gender gap in starting salaries
 - The gap persists even after controlling for several relevant factors
-- Women earn roughly 7% less on average at hire
+- Women earn roughly 9% less on average at hire
 
-Yes, the results indicate a statistically significant gender difference in starting salaries, with women earning substantially less than men both before and after controlling for field, degree year, and hire year. The estimated gap is about $291 per month (~9%). Therefore, there is strong evidence of a gender salary disparity in starting pay. However, because observational data cannot establish causation, this analysis alone cannot definitively conclude that the disparity is due to wage discrimination.
+Yes, the results indicate a statistically significant gender difference in starting salaries, with women earning substantially less than men both before and after controlling for field, degree year, and hire year. The estimated gap is about $441 per month (~9%). Therefore, there is strong evidence of a gender salary disparity in starting pay. However, because observational data cannot establish causation, this analysis alone cannot definitively conclude that the disparity is due to wage discrimination.
 
 ---
