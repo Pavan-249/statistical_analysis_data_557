@@ -4,11 +4,11 @@ subtitle: "DATA 557 W26 Final Project - Deliverable 1"
 author: "Maanya Cola Bharath, Roxanne Dimadi, Ha Tien Nguyen, Hannah Sun, Pavan Suresh, Lay Yang"
 date: "`r Sys.Date()`"
 output:
-  pdf_document: default
   html_document:
     toc: true
     toc_float: true
     toc_depth: 3
+  pdf_document: default
 ---
 
 ```{r, warning=FALSE, message=FALSE, include = FALSE}
@@ -282,7 +282,7 @@ ggplot(start_salary, aes(x = sex, y = salary, fill = sex)) +
   theme_minimal()
 ```
 
-### Naive Statistical Test
+### Statistical Tests
 
 We test the null hypothesis \(H_0: \mu_M - \mu_F = 0\) against the two-sided alternative \(H_A: \mu_M - \mu_F \neq 0\), where \(\mu_M\) and \(\mu_F\) denote the population mean starting salaries for male and female faculty, respectively.
 
@@ -367,8 +367,15 @@ cat("\nApproximate percent difference for women in starting salary:\n")
 cat(round((exp(q1_log_coef) - 1) * 100, 2), "%\n")
 ```
 
-## 4a. Q2: Wage difference at promotion
-```{r}
+# 5. Q2: Wage Discrimination in Promotion
+
+In addition to starting salaries, promotion dynamics can contribute to long-term salary disparities. Academic promotion, particularly advancement from Associate Professor to Full Professor, often leads to substantial salary increases. We constructed a promotion-level dataset containing one observation per faculty member at the first observed Associate-to-Full transition. For each promoted faculty member, we computed both the dollar rise and the percent raise This yielded 547 promoted faculty members, including 447 men and 100 women.
+
+### Salary Increase at Promotion by Sex
+
+Women had slightly larger promotion raises on average than men. The mean dollar rise was about \$516.69 for women and \$469.98 for men, while the mean percent raise was 12.9% for women and 12.4% for men. 
+
+```{r, include = FALSE}
 promotion_data <- salary_clean %>%
   arrange(id, year) %>%
   group_by(id) %>%
@@ -392,7 +399,8 @@ promotion_data <- promotion_data %>%
   slice(1) %>%
   ungroup()
 ```
-```{r}
+
+```{r, include = FALSE}
 promotion_data <- promotion_data %>%
   mutate(
     raise_amount = salary - prev_salary,
@@ -413,26 +421,34 @@ promotion_data %>%
   print()
 ```
 
-```{r}
-ggplot(promotion_data, aes(x = sex, y = raise_amount, fill = sex)) +
+```{r, echo = FALSE}
+promotion_long <- promotion_data %>%
+  select(sex, raise_amount, raise_pct) %>%
+  pivot_longer(
+    cols = c(raise_amount, raise_pct),
+    names_to = "metric",
+    values_to = "value"
+  )
+
+ggplot(promotion_long, aes(x = sex, y = value, fill = sex)) +
   geom_boxplot(alpha = 0.8) +
   scale_fill_manual(values = sex_colours) +
+  facet_wrap(
+    ~metric,
+    scales = "free_y",
+    labeller = as_labeller(c(
+      raise_amount = "Dollar Raise",
+      raise_pct = "Percent Raise"
+    ))
+  ) +
   labs(
     title = "Salary Increase at Promotion (Associate to Full) by Sex",
     x = "Sex",
-    y = "Dollar Raise at Promotion"
+    y = NULL
   )
+```
 
-ggplot(promotion_data, aes(x = sex, y = raise_pct, fill = sex)) +
-  geom_boxplot(alpha = 0.8) +
-  scale_fill_manual(values = sex_colours) +
-  scale_y_continuous(labels = percent_format(accuracy = 1)) +
-  labs(
-    title = "Percent Raise at Promotion by Sex",
-    x = "Sex",
-    y = "Percent Raise"
-  )
-
+```{r, include = FALSE}
 ggplot(promotion_data, aes(x = raise_pct, fill = sex)) +
   geom_histogram(alpha = 0.6, bins = 20, position = "identity") +
   scale_fill_manual(values = sex_colours) +
@@ -445,7 +461,22 @@ ggplot(promotion_data, aes(x = raise_pct, fill = sex)) +
   )
 ```
 
-```{r}
+### Statistical Tests
+
+For the Welch two-sample t-tests, we test \(H_0: \mu_M - \mu_F = 0\) versus \(H_A: \mu_M - \mu_F \neq 0\),  
+where \(\mu_M\) and \(\mu_F\) represent the population mean promotion raises for men and women, respectively.
+
+For the Wilcoxon rank-sum test, the null hypothesis states that the distributions of percent raises for men and women are identical, while the alternative hypothesis states that the distributions differ.
+
+We first conducted statistical tests comparing promotion raises between men and women without controlling for other factors. Welch two-sample t-tests were used to compare both the dollar raise and the percent raise at promotion. Although women had slightly larger average raises than men in both measures, neither difference was statistically significant. Because raise distributions may be skewed, we also performed a Wilcoxon rank-sum test for percent raise as a nonparametric check, which similarly found no significant difference between men and women. We do not have sufficient statistical evidence to reject the null hypothesis.
+
+| Test | Measure | Mean (M) | Mean (F) | Test Statistic | p-value | 95% CI |
+|---|---|---|---|---|---|---|
+| Welch t-test | Dollar raise ($) | 469.98 | 516.69 | t = -1.1385 | 0.2566 | [-127.74, 34.33] |
+| Welch t-test | Percent raise | 12.43% | 12.90% | t = -0.4517 | 0.6520 | [-2.51%, 1.57%] |
+| Wilcoxon | Percent raise | — | — | W = 20318 | 0.1550 | — |
+
+```{r, include = FALSE}
 cat("\nQ2 Welch t-test for dollar raise:\n")
 print(t.test(raise_amount ~ sex, data = promotion_data))
 
@@ -456,7 +487,20 @@ cat("\nQ2 Wilcoxon test for percent raise:\n")
 print(wilcox.test(raise_pct ~ sex, data = promotion_data))
 ```
 
-```{r}
+### Regression Models
+
+We estimated linear regression models for both the dollar raise and the percent raise received at promotion from Associate Professor to Full Professor. The models included gender, academic field, year of highest degree, and pre-promotion salary (prev_salary) as predictors. Including prev_salary controls for the baseline salary level prior to promotion, since raise amounts and percentage increases often depend on the starting salary.
+
+In the dollar raise model, the coefficient on the female indicator was small and not statistically significant, indicating no evidence that women received smaller raises than men at the time of promotion after controlling for field, experience, and prior salary. Using heteroskedasticity-robust standard errors did not change these conclusions. In the percent raise model, the gender coefficient likewise remained small and statistically insignificant.
+
+| Metric | \$ Raise (Std. SE) | \$ Raise (Robust SE) | % Raise (Std. SE) | % Raise (Robust SE) |
+|---|---|---|---|---|
+| sexF coef estimate | 25.86 | 25.86 | 0.0023 | 0.0023 |
+| sexF p-value | 0.546 | 0.522 | 0.849 | 0.822 |
+| R-squared | 0.074 | 0.074 | 0.079 | 0.079 |
+| Adj. R-squared | 0.066 | 0.066 | 0.071 | 0.071 |
+
+```{r, include = FALSE}
 q2_lm_raise <- lm(
   raise_amount ~ sex + field + yrdeg + prev_salary,
   data = promotion_data
@@ -477,6 +521,8 @@ summary(q2_lm_pct)
 cat("\nQ2 regression for percent raise with robust SE:\n")
 coeftest(q2_lm_pct, vcov = vcovHC(q2_lm_pct, type = "HC1"))
 ```
+
+Our regression results show no statistically significant difference in promotion raises between men and women after controlling for field, year of highest degree, and pre-promotion salary. This finding is consistent across both dollar and percent raise models and remains unchanged when using heteroskedasticity-robust standard errors. Prior to conducting this analysis, we expected that gender disparities might also appear in promotion raises. However, the results suggest that the size of the raise at promotion itself does not differ systematically by gender once relevant factors are taken into account.
 
 ### 4b. Q2: Promotion Rates and Within-Rank Wage Gaps
 This section investigates whether there are gender differences in promotion rates from Associate Professor to Full Professor, as well as differences in salary within academic ranks. Specifically, we examine (1) whether men and women are promoted to Full Professor at different rates, (2) how long faculty spend as Associate Professors before promotion, and (3) whether women earn systematically different salaries within the Associate and Full ranks after controlling for relevant characteristics.
