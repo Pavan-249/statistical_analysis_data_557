@@ -1,6 +1,7 @@
 ---
 title: "Final Project Code Appendix"
 output:
+  pdf_document: default
   html_document: default
 ---
 
@@ -45,7 +46,7 @@ salary_clean <- salary %>%
   filter(experience >= 0, !is.na(rank))
 ```
 
-## 2. Descriptive summaries
+## 2.1 Exploratory Analysis Numerical Summaries
 ```{r}
 salary_clean %>%
   count(sex, rank, field)
@@ -61,6 +62,54 @@ salary_clean %>%
 
 # colour palette for sex used across all plots
 sex_colours <- c("M" = "#4472C4", "F" = "#E05C5C")
+```
+
+## 2.2 Exploratory Analysis Plots
+```{r}
+salary_clean %>%
+  count(sex) %>%
+  ggplot(aes(x = sex, y = n, fill = sex)) +
+  geom_col(width = 0.6) +
+  scale_fill_manual(values = sex_colours) +
+  labs(
+    title = "Number of Observations by Sex",
+    x = "Sex",
+    y = "Number of Records"
+  )
+
+ggplot(salary_clean, aes(x = sex, y = salary, fill = sex)) +
+  geom_boxplot(alpha = 0.8) +
+  scale_fill_manual(values = sex_colours) +
+  facet_wrap(~ rank, scales = "free_y") +
+  labs(
+    title = "Salary Distribution by Sex Within Rank",
+    x = "Sex",
+    y = "Monthly Salary"
+  )
+
+salary_clean %>%
+  group_by(year, sex) %>%
+  summarise(mean_salary = mean(salary), .groups = "drop") %>%
+  ggplot(aes(x = year, y = mean_salary, color = sex)) +
+  geom_line(size = 1) +
+  scale_color_manual(values = sex_colours) +
+  labs(
+    title = "Average Salary Over Time by Sex",
+    x = "Year",
+    y = "Average Salary"
+  )
+
+salary_clean %>%
+  group_by(rank, sex) %>%
+  summarise(mean_salary = mean(salary), .groups = "drop") %>%
+  ggplot(aes(x = rank, y = mean_salary, fill = sex)) +
+  geom_col(position = "dodge") +
+  scale_fill_manual(values = sex_colours) +
+  labs(
+    title = "Average Salary by Sex Within Rank",
+    x = "Academic Rank",
+    y = "Average Salary"
+  )
 ```
 
 ## 3. Q1: Starting salary discrimination
@@ -435,9 +484,9 @@ print(chisq.test(ct, correct = FALSE))
 
 #### Observations
 
-The promotion rate for women is 0.420, while the promotion rate for men is 0.599, producing a difference of −0.179. The 95% confidence interval for this difference is (−0.251, −0.107), which does not include zero.
+The promotion rate for women is 0.420, while the promotion rate for men is 0.599, producing a difference of -0.179. The 95% confidence interval for this difference is (-0.251, -0.107), which does not include zero.
 
-The z-test statistic is −4.84, with a p-value less than 0.001, indicating that the difference in promotion rates between men and women is statistically significant. The equivalent chi-square test yields the same conclusion.
+The z-test statistic is -4.84, with a p-value less than 0.001, indicating that the difference in promotion rates between men and women is statistically significant. The equivalent chi-square test yields the same conclusion.
 
 These results provide strong evidence that women were less likely to be promoted from Associate to Full Professor during the sample period.
 
@@ -489,9 +538,9 @@ for (rnk in c("Assoc", "Full")) {
 
 The regression results indicate a statistically significant negative coefficient on the female indicator in both ranks.
 
-Among Associate Professors, the coefficient on sexF corresponds to an approximate salary difference of −5.3%, meaning that women earn about 5.3% less than men on average after controlling for experience, year effects, field, degree type, and administrative roles.
+Among Associate Professors, the coefficient on sexF corresponds to an approximate salary difference of -5.3%, meaning that women earn about 5.3% less than men on average after controlling for experience, year effects, field, degree type, and administrative roles.
 
-Among Full Professors, the estimated difference is −5.5%, indicating that women continue to earn roughly 5–6% less than men even after reaching the highest academic rank and after accounting for observable characteristics.
+Among Full Professors, the estimated difference is -5.5%, indicating that women continue to earn roughly 5–6% less than men even after reaching the highest academic rank and after accounting for observable characteristics.
 
 #### Interpretation
 
