@@ -1,14 +1,14 @@
 ---
 title: "Statistical Analysis of Gender Pay Disparities in University Faculty Salaries"
-subtitle: "DATA 557 W26 Final Project - Deliverable 1"
+subtitle: "DATA 557 W26 Final Project - Interactive Data Story"
 author: "Maanya Cola Bharath, Roxanne Dimadi, Ha Tien Nguyen, Hannah Sun, Pavan Suresh, Lay Yang"
 date: "`r Sys.Date()`"
 output:
+  pdf_document: default
   html_document:
     toc: true
     toc_float: true
     toc_depth: 4
-  pdf_document: default
 ---
 
 ```{r, warning=FALSE, message=FALSE, include = FALSE}
@@ -33,6 +33,8 @@ Specifically, we address four questions:
 3. Overall: Is there wage discrimination in salaries at the university?
 
 4. What issues are involved in generalizing our results?
+
+All analyses assesses statistical significance at the a = 0.05 level using two-sided tests.
 
 
 # 2. Data
