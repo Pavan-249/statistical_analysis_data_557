@@ -4,11 +4,11 @@ subtitle: "DATA 557 W26 Final Project - Deliverable 1"
 author: "Maanya Cola Bharath, Roxanne Dimadi, Ha Tien Nguyen, Hannah Sun, Pavan Suresh, Lay Yang"
 date: "`r Sys.Date()`"
 output:
-  pdf_document: default
   html_document:
     toc: true
     toc_float: true
     toc_depth: 4
+  pdf_document: default
 ---
 
 ```{r, warning=FALSE, message=FALSE, include = FALSE}
@@ -317,7 +317,7 @@ To further investigate whether gender differences in starting salaries persist a
 
 All predictors in the model are statistically significant at the 5% level. The regression results show that the coefficient for sexF is -197.94, indicating that, holding rank, field, degree year, and hire year constant, women earn on average approximately \$198 less in starting salary per month than men. The corresponding p-value is 0.00199. On average and controlling for other predictors, faculty hired directly as Associate Professors earn approximately \$686 more per month than Assistant Professors, while those hired as Full Professors earn around $2624 more per month than Assistant Professors. Adjusting for other variables, starting salaries in Other fields exceed those in Arts by roughly \$397 on average, and Professional fields exceed Arts on average by approximately \$920. Starting salaries increase substantially over time, as reflected by the positive coefficient on hiring year. In addition, faculty who obtained their highest degree more recently tend to receive slightly lower starting salaries, holding other variables constant.
 
-Overall, the model explains a substantial portion of the variation in starting salaries, with an R-squared value of 0.72. These results suggest that rank, field, and hiring year are major determinants of starting salary, and that a statistically significant gender difference remains even after controlling for these factors.
+Overall, the model explains a substantial portion of the variation in starting salaries, with an R-squared value of 0.72. These results suggest that rank, field, and hiring year are correlated with starting salary, and that a statistically significant gender difference remains even after controlling for these factors.
 
 ```{r, echo = FALSE}
 q1_lm <- lm(salary ~ sex + rank + field + yrdeg + startyr, data = start_salary)
@@ -489,7 +489,27 @@ print(wilcox.test(raise_pct ~ sex, data = promotion_data))
 
 ### Regression Models
 
-We estimated linear regression models for both the dollar raise and the percent raise received at promotion from Associate Professor to Full Professor. The models included gender, academic field, year of highest degree, and pre-promotion salary (prev_salary) as predictors. Including prev_salary controls for the baseline salary level prior to promotion, since raise amounts and percentage increases often depend on the starting salary.
+We estimated linear regression models for both the dollar raise and the percent raise received at promotion from Associate Professor to Full Professor. The models included gender, academic field, year of highest degree, and pre-promotion salary (prev_salary) as predictors. Including prev_salary controls for the baseline salary level prior to promotion, since raise amounts and percentage increases often depend on the starting salary. Model equations:
+
+\[
+\text{raiseamount}_i =
+\beta_0 + \beta_1\,sexF_i
++ \beta_2\,I(field_i=\text{Other})
++ \beta_3\,I(field_i=\text{Prof})
++ \beta_4\,yrdeg_i
++ \beta_5\,prev\_salary_i
++ \epsilon_i
+\]
+
+\[
+\text{raisepct}_i =
+\beta_0 + \beta_1\,sexF_i
++ \beta_2\,I(field_i=\text{Other})
++ \beta_3\,I(field_i=\text{Prof})
++ \beta_4\,yrdeg_i
++ \beta_5\,prev\_salary_i
++ \epsilon_i
+\]
 
 In the dollar raise model, the coefficient on the female indicator was small and not statistically significant, indicating no evidence that women received smaller raises than men at the time of promotion after controlling for field, experience, and prior salary. Using heteroskedasticity-robust standard errors did not change these conclusions. In the percent raise model, the gender coefficient likewise remained small and statistically insignificant.
 
@@ -582,7 +602,7 @@ promotion_rates <- person_level %>%
 promotion_rates
 ```
 
-To test whether promotion rates differ significantly between men and women, we conducted a two-sample test for the difference in promotion proportions. We also performed a chi-square test of independence on the corresponding 2×2 contingency table. The two approaches are mathematically equivalent for a binary outcome, and both tests produced the same conclusion that the promotion rate differs significantly between men and women. Both tests produced consistent results, with a two-sample proportion test statistic of (z = -4.84) and an equivalent chi-square statistic of ($\chi^2$ = 23.43) (df = 1). These results provide evidence that women were significantly less likely to be promoted from Associate to Full Professor during the sample period.
+To test whether promotion rates differ significantly between men and women, we conducted a two-sample test for the difference in promotion proportions. We also performed a chi-square test of independence on the corresponding 2x2 contingency table. The two approaches are mathematically equivalent for a binary outcome, and both tests produced the same conclusion that the promotion rate differs significantly between men and women. Both tests produced consistent results, with a two-sample proportion test statistic of (z = -4.84) and an equivalent chi-square statistic of ($\chi^2$ = 23.43) (df = 1). These results provide evidence that women were significantly less likely to be promoted from Associate to Full Professor during the sample period.
 
 ```{r, include = FALSE}
 nF <- sum(person_level$sex == "F")
@@ -651,8 +671,11 @@ for (rnk in c("Assoc", "Full")) {
 
 In contrast to the main Question 2 analysis, which found no gender difference in the size of wage increases at promotion, these results indicate that women were less likely to be promoted and earned modestly lower salaries than men within both ranks after controlling for observable characteristics. Together, these patterns suggest that gender disparities arise through promotion dynamics and within-rank wage differences, rather than differences in the raise received at promotion.
 
-# 5. Q3: Overall salary discrimination
-```{r}
+# 6. Q3: Overall Salary Discrimination
+
+Collectively, we examine whether gender disparities exist in overall faculty salaries at the university. Because the dataset contains multiple observations for each faculty member over time, a full analysis of salary trajectories would normally require longitudinal methods. However, implementing a panel or longitudinal model is beyond the scope of this course. Instead, we construct a cross-sectional dataset by selecting the most recent salary observation for each faculty member, resulting in one row per individual representing their latest observed salary.
+
+```{r, include = FALSE}
 # avoid longitudinal methods by using one row per faculty (latest salary)
 latest_salary <- salary_clean %>%
   arrange(id, year) %>%
@@ -673,7 +696,7 @@ latest_salary %>%
   print()
 ```
 
-```{r}
+```{r, include = FALSE}
 cat("\nLatest salary summaries by sex and rank:\n")
 latest_salary %>%
   group_by(rank, sex) %>%
@@ -706,29 +729,36 @@ ggplot(latest_salary, aes(x = salary, fill = sex)) +
   )
 ```
 
-```{r}
+
+### Regression Model
+
+To assess whether gender differences in salary persist after controlling for observable characteristics, we estimate three regression specifications using the latest salary for each faculty member:
+
+1. Baseline salary model controlling for gender, rank, field, experience, and administrative role: 
+
+\( salary_i = \beta_0 + \beta_1\,sexF_i + \beta_2\,I(rank_i=\text{Assoc}) + \beta_3\,I(rank_i=\text{Full}) + \beta_4\,I(field_i=\text{Other}) + \beta_5\,I(field_i=\text{Prof}) + \\ \beta_6\,experience_i + \beta_7\,admin_i + \epsilon_i \)
+
+2. Log-salary model, which accounts for the right-skewed distribution of salaries and allows coefficients to be interpreted approximately as percentage differences:
+
+\( \log(\text{salary}_i) = \beta_0 + \beta_1\,sexF_i + \beta_2\,I(rank_i=\text{Assoc}) + \beta_3\,I(rank_i=\text{Full}) + \beta_4\,I(field_i=\text{Other}) + \beta_5\,I(field_i=\text{Prof}) + \\ \beta_6\,experience_i + \beta_7\,admin_i + \epsilon_i \)
+
+3. Log-salary interaction model, which allows the gender salary gap to vary for faculty holding administrative positions: 
+
+\( \log(\text{salary}_i) = \beta_0 + \beta_1\,sexF_i + \beta_2\,admin_i + \beta_3(sexF_i \times admin_i) + \beta_4\,I(rank_i=\text{Assoc}) + \beta_5\,I(rank_i=\text{Full}) + \\ \beta_6\,I(field_i=\text{Other}) + \beta_7\,I(field_i=\text{Prof}) + \beta_8\,experience_i + \epsilon_i \)
+
+For all models, we report results using both standard and heteroskedasticity-robust standard errors.
+
+```{r, include = FALSE}
 q3_lm <- lm(
   salary ~ sex + rank + field + experience + admin,
   data = latest_salary
 )
-cat("\nQ3 overall salary model (latest salary):\n")
+cat("\nQ3 baseline salary model (latest salary):\n")
 summary(q3_lm)
 
-cat("\nQ3 overall salary model with robust SE:\n")
+cat("\nQ3 baseline salary model with robust SE:\n")
 coeftest(q3_lm, vcov = vcovHC(q3_lm, type = "HC1"))
 
-# interaction model: does the salary gap differ by rank?
-q3_interaction <- lm(
-  salary ~ sex * rank + field + experience + admin,
-  data = latest_salary
-)
-cat("\nQ3 salary model with sex x rank interaction:\n")
-summary(q3_interaction)
-
-cat("\nQ3 interaction model with robust SE:\n")
-coeftest(q3_interaction, vcov = vcovHC(q3_interaction, type = "HC1"))
-
-# log-salary
 q3_lm_log <- lm(
   log_salary ~ sex + rank + field + experience + admin,
   data = latest_salary
@@ -739,16 +769,57 @@ summary(q3_lm_log)
 cat("\nQ3 log-salary model with robust SE:\n")
 coeftest(q3_lm_log, vcov = vcovHC(q3_lm_log, type = "HC1"))
 
-# coefs
 q3_log_coef <- coef(q3_lm_log)["sexF"]
 cat("\nApproximate percent difference for women in latest salary:\n")
 cat(round((exp(q3_log_coef) - 1) * 100, 2), "%\n")
+
+q3_log_interaction <- lm(
+  log_salary ~ sex * admin + rank + field + experience,
+  data = latest_salary
+)
+cat("\nQ3 log-salary model with sex x admin interaction:\n")
+summary(q3_log_interaction)
+
+cat("\nQ3 log-salary interaction model with robust SE:\n")
+coeftest(q3_log_interaction, vcov = vcovHC(q3_log_interaction, type = "HC1"))
 ```
 
+| Model | Coefficient | Estimate | Robust SE | p-value | Meaning (On Average) |
+|------|------|------|------|------|------|
+| **Baseline** | sexF | -409.32 | 70.02 | 6.10e-09 | Women earn about **\$409 less** than comparable men |
+| **Log-Salary** | sexF | -0.0590 | 0.0108 | 5.21e-08 | Women earn about **5.7% less** than comparable men |
+| **Log-Salary Interaction** | sexF | -0.0492 | 0.0113 | 1.45e-05 | Among **non-administrators**, women earn about **4.8% less** than comparable men |
+| | sexF x admin | -0.1078 | 0.0322 | 0.000824 | Female administrators earn an additional **~10.8% less** than comparable male administrators |
 
+In the baseline linear salary model, the coefficient on the female indicator is -409 and statistically significant. This suggests that, after controlling for rank, field, experience, and administrative roles, women earn about $409 less on average than comparable men. The result remains statistically significant when using heteroskedasticity-robust standard errors.
 
+The log-salary model confirms the presence of a gender salary gap while accounting for the right-skewed distribution of salaries. The estimated coefficient on sexF is -0.059, which corresponds to an approximate salary difference of -5.7%, indicating that women earn about 5-6% less than comparable male faculty members.
 
+Finally, the log-salary interaction model allows the gender salary gap to differ for faculty holding administrative roles. In this specification, the coefficient on sexF represents the gender difference among non-administrators, indicating that women in non-administrative positions earn about 4.8% less than comparable men. The interaction term sexF x admin is -0.108 and statistically significant, implying that female administrators earn an additional 10.8% less than comparable male administrators. Taken together, these results suggest that gender differences in salary persist overall and may be particularly pronounced among faculty holding administrative roles.
 
+# 7. Q4: Issues in Generalizing Results
 
+### Statistical Model Limitations
 
+Several limitations arise from the statistical models used in this analysis. First, the regression specifications assume linear relationships between predictors and salary (or log-salary), which may not fully capture nonlinear salary growth over academic careers. Second, the models treat observations as independent even though the dataset contains repeated salary observations for the same individuals over time, potentially understating standard errors due to within-person correlation. Although heteroskedasticity-robust standard errors and log-salary models help improve inference, these adjustments address statistical issues rather than resolving underlying model limitations. Finally, because the analysis is based on observational data rather than experimental design, the results should be interpreted as associations rather than causal estimates of gender discrimination.
+
+### Data and Scope Limitations
+
+Additional limitations arise from the dataset and the scope of the study. The data represent a single university between 1976 and 1995, and compensation structures, promotion policies, and hiring practices vary across institutions and time periods. As a result, the patterns observed three decades ago may not generalize to other universities or to more recent academic labor markets. Furthermore, the dataset does not contain information on important determinants of academic compensation such as research productivity, publication records, grant funding, or teaching performance. These unobserved factors may influence salary outcomes and could partially explain some of the observed relationships. Finally, the analysis focuses on specific outcomes such as starting salaries and promotion raises while other dimensions of academic careers, including time to promotion or administrative opportunities, may also contribute to long-term disparities.
+
+# Conclusion
+
+### Comparison of Results
+
+Our results from Parts 4, 5, and 6 suggest that gender disparities in faculty pay are present, but they do not arise in exactly the same way at every stage of an academic career. In Part 4, we found evidence of a gender gap in starting salaries: even after controlling for rank, field, degree year, and hire year, women earned lower starting salaries than comparable men, with the log-salary model indicating an estimated gap of about 4.85%. 
+
+Part 5 leads to a more nuanced conclusion. Our main promotion-raise analysis found no statistically significant gender difference in the size of the raise received at the Associate-to-Full promotion. On its own, this result might seem to weaken the case for gender-based wage discrimination. However, it does not contradict the conclusions from Parts 4 and 6, because it addresses a much narrower question: whether men and women who were promoted received different incremental raises at that specific transition. That is different from asking whether women faced disadvantages in initial salary setting, in the likelihood of being promoted, or in salaries within rank. In fact, the extension in Part 5 showed that women were less likely to be promoted from Associate to Full Professor and also earned about 5–6% less within rank among both Associate and Full Professors, even after controlling for observable characteristics. These findings suggest that gender disparities may operate through promotion access and within-rank pay differences, rather than through the size of the raise once promotion occurs.
+
+Part 6 reinforces the broader conclusion that overall salary discrimination persists at the university. Using the most recent salary observation for each faculty member, we found that women earned about $409 less than comparable men in the linear model and about 5.7% less in the log-salary model. The interaction model further suggested that the gender gap may be even larger among administrators. Thus, even though the promotion-raise result in Part 5 did not show unequal raises at the moment of promotion, the overall evidence across the project still points to persistent gender disparities in salary outcomes.
+
+Overall, the Part 5 finding is best understood as related but not contradictory to the overall conclusion. It tells us that the observed salary gap is not primarily driven by unequal raises at promotion itself. Instead, the combined evidence from Parts 4, 5, and 6 suggests that gender inequality is more likely to emerge through lower starting salaries, lower promotion rates, and lower salaries within rank, which then accumulate over time into the broader salary disparities observed in Part 6.
+
+### Future Work
+
+Several avenues for future research remain. One promising direction would be to model salary trajectories using panel data methods to examine how gender disparities evolve over time. Additional work could also study promotion timing using survival analysis to determine whether women experience longer paths to promotion. Expanding the analysis to multiple institutions and incorporating additional measures of faculty productivity, such as publications and grant funding, would further clarify the mechanisms underlying observed salary gaps.
 
