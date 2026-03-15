@@ -286,6 +286,15 @@ coeftest(q2_lm_pct, vcov = vcovHC(q2_lm_pct, type = "HC1"))
 ```
 
 ### 4b. Q2: Promotion Rates and Within-Rank Wage Gaps
+This section investigates whether there are gender differences in promotion rates from Associate Professor to Full Professor, as well as differences in salary within academic ranks. Specifically, we examine (1) whether men and women are promoted to Full Professor at different rates, (2) how long faculty spend as Associate Professors before promotion, and (3) whether women earn systematically different salaries within the Associate and Full ranks after controlling for relevant characteristics.
+
+#### Method
+
+We first construct a **person-level dataset** restricted to faculty who have ever held the rank of Associate Professor. For each individual, we identify whether they were eventually promoted to Full Professor, the year they first became an Associate Professor, and the year they were first promoted to Full Professor (if applicable). We also compute the number of years spent as an Associate Professor before promotion. Additionally, we record salary at Associate entry, the last Associate salary, and the salary at entry into the Full Professor rank.
+
+This person-level dataset allows us to compare promotion outcomes and salary changes across individuals.
+
+```{r}
 ```{r}
 # build person-level dataset restricted to ever-Associate faculty
 ever_assoc_ids <- salary_clean %>%
@@ -317,7 +326,9 @@ person_level <- salary_clean %>%
     .groups = "drop"
   )
 ```
+#### Promotion Rates by Sex
 
+We first compare promotion rates between men and women by computing the proportion of Associate Professors who were eventually promoted to Full Professor by the end of the observation period.
 ```{r}
 cat("Promotion rates by sex:\n")
 person_level %>%
@@ -344,6 +355,18 @@ person_level %>%
   summarise(median_yrs = median(yrs_as_assoc, na.rm = TRUE), .groups = "drop") %>%
   print()
 ```
+#### Observations
+
+The results show that 59.9% of male Associate Professors were promoted to Full Professor, compared to 42.0% of female Associate Professors. The contingency table indicates that 447 of 746 men were promoted, while only 100 of 238 women were promoted.
+
+Examining row proportions shows that about 60% of men were promoted compared to 42% of women, suggesting a substantial gender gap in promotion outcomes.
+
+Among those who were promoted, the median time spent as an Associate Professor was 5 years for men and 6 years for women, indicating that women tend to remain in the Associate rank slightly longer before promotion.
+
+
+#### Visualization of Promotion and Salary Patterns
+
+To better understand these patterns, we visualize promotion rates, entry salaries at the Associate rank, salary gains upon promotion, and the distribution of time spent as an Associate Professor.
 ```{r}
 # promotion rate bar chart
 ggplot(person_level %>% group_by(sex) %>% summarise(pct = mean(promoted)),
@@ -379,6 +402,9 @@ ggplot(person_level %>% filter(promoted == 1),
   labs(title = "Years as Associate Before Promotion",
        x = "Years", y = "Count")
 ```
+#### Statistical Test for Differences in Promotion Rates
+To formally test whether the difference in promotion rates between men and women is statistically significant, we conduct a two-sample z-test for the difference in proportions. This test evaluates the null hypothesis that the promotion probability is the same for men and women.
+
 ```{r}
 # two-sample z-test for difference in promotion proportions
 nF <- sum(person_level$sex == "F")
@@ -407,22 +433,35 @@ cat("\nEquivalent chi-square test:\n")
 print(chisq.test(ct, correct = FALSE))
 ```
 
-```{r}
-# logistic regression for probability of promotion by 1995
-q2_logit <- glm(
-  promoted ~ sex + field + yrdeg + deg,
-  data   = person_level,
-  family = binomial(link = "logit")
-)
-cat("Logistic regression — promotion outcome:\n")
-summary(q2_logit)
+#### Observations
 
-cat("\nOdds ratios (95% CI):\n")
-exp(cbind(OR = coef(q2_logit), confint(q2_logit))) %>%
-  round(3) %>%
-  print()
-```
+The promotion rate for women is 0.420, while the promotion rate for men is 0.599, producing a difference of −0.179. The 95% confidence interval for this difference is (−0.251, −0.107), which does not include zero.
 
+The z-test statistic is −4.84, with a p-value less than 0.001, indicating that the difference in promotion rates between men and women is statistically significant. The equivalent chi-square test yields the same conclusion.
+
+These results provide strong evidence that women were less likely to be promoted from Associate to Full Professor during the sample period.
+
+#### Within-Rank Wage Gap Analysis
+
+Next, we examine whether salary differences persist within academic ranks after controlling for relevant characteristics. For each rank (Associate and Full Professor), we estimate a log-linear regression model where the dependent variable is the logarithm of salary.
+
+The model controls for:
+
+sex
+
+year of degree
+
+calendar year
+
+administrative roles
+
+years of experience
+
+academic field
+
+degree type
+
+Using log salary allows the coefficient on the gender indicator to be interpreted approximately as a percentage difference in salary.
 ```{r}
 # log-salary regression within rank to estimate adjusted wage gap by sex
 for (rnk in c("Assoc", "Full")) {
@@ -446,7 +485,17 @@ for (rnk in c("Assoc", "Full")) {
               (exp(coef_f) - 1) * 100))
 }
 ```
+#### Results
 
+The regression results indicate a statistically significant negative coefficient on the female indicator in both ranks.
+
+Among Associate Professors, the coefficient on sexF corresponds to an approximate salary difference of −5.3%, meaning that women earn about 5.3% less than men on average after controlling for experience, year effects, field, degree type, and administrative roles.
+
+Among Full Professors, the estimated difference is −5.5%, indicating that women continue to earn roughly 5–6% less than men even after reaching the highest academic rank and after accounting for observable characteristics.
+
+#### Interpretation
+
+Taken together, these results suggest two important patterns. First, women were less likely to be promoted from Associate to Full Professor during the study period. Second, conditional on rank and other observed characteristics, women earned modestly lower salaries than men within both the Associate and Full Professor ranks. These findings suggest that gender disparities may arise both through promotion dynamics and within-rank wage differences.
 
 ## 5. Q3: Overall salary discrimination
 ```{r}
