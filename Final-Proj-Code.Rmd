@@ -1,7 +1,6 @@
 ---
 title: "Final Project Code Appendix"
 output:
-  pdf_document: default
   html_document: default
 ---
 
@@ -59,6 +58,9 @@ salary_clean %>%
     max_year = max(year, na.rm = TRUE)
   ) %>%
   print()
+
+# colour palette for sex used across all plots
+sex_colours <- c("M" = "#4472C4", "F" = "#E05C5C")
 ```
 
 ## 3. Q1: Starting salary discrimination
@@ -109,6 +111,7 @@ par(mfrow = c(1, 1))
 
 ggplot(start_salary, aes(x = salary, fill = sex)) +
   geom_histogram(alpha = 0.6, bins = 25, position = "identity") +
+  scale_fill_manual(values = sex_colours) +
   facet_wrap(~ sex, scales = "free_y") +
   labs(
     title = "Starting Salary Distribution by Sex",
@@ -118,6 +121,7 @@ ggplot(start_salary, aes(x = salary, fill = sex)) +
 
 ggplot(start_salary, aes(x = sex, y = salary, fill = sex)) +
   geom_boxplot(alpha = 0.8) +
+  scale_fill_manual(values = sex_colours) +
   labs(
     title = "Starting Salary by Sex",
     x = "Sex",
@@ -126,6 +130,7 @@ ggplot(start_salary, aes(x = sex, y = salary, fill = sex)) +
 
 ggplot(start_salary, aes(x = factor(startyr), y = salary, fill = sex)) +
   geom_boxplot(outlier.alpha = 0.3) +
+  scale_fill_manual(values = sex_colours) +
   labs(
     title = "Starting Salary by Hire Year and Sex",
     x = "Hire Year",
@@ -169,7 +174,7 @@ cat(round((exp(q1_log_coef) - 1) * 100, 2), "%\n")
 ```
 
 
-## 4. Q2: Wage difference at promotion
+## 4a. Q2: Wage difference at promotion
 ```{r}
 promotion_data <- salary_clean %>%
   arrange(id, year) %>%
@@ -218,6 +223,7 @@ promotion_data %>%
 ```{r}
 ggplot(promotion_data, aes(x = sex, y = raise_amount, fill = sex)) +
   geom_boxplot(alpha = 0.8) +
+  scale_fill_manual(values = sex_colours) +
   labs(
     title = "Salary Increase at Promotion (Associate to Full) by Sex",
     x = "Sex",
@@ -226,6 +232,7 @@ ggplot(promotion_data, aes(x = sex, y = raise_amount, fill = sex)) +
 
 ggplot(promotion_data, aes(x = sex, y = raise_pct, fill = sex)) +
   geom_boxplot(alpha = 0.8) +
+  scale_fill_manual(values = sex_colours) +
   scale_y_continuous(labels = percent_format(accuracy = 1)) +
   labs(
     title = "Percent Raise at Promotion by Sex",
@@ -235,6 +242,7 @@ ggplot(promotion_data, aes(x = sex, y = raise_pct, fill = sex)) +
 
 ggplot(promotion_data, aes(x = raise_pct, fill = sex)) +
   geom_histogram(alpha = 0.6, bins = 20, position = "identity") +
+  scale_fill_manual(values = sex_colours) +
   facet_wrap(~ sex) +
   scale_x_continuous(labels = percent_format(accuracy = 1)) +
   labs(
@@ -277,6 +285,169 @@ cat("\nQ2 regression for percent raise with robust SE:\n")
 coeftest(q2_lm_pct, vcov = vcovHC(q2_lm_pct, type = "HC1"))
 ```
 
+### 4b. Q2: Promotion Rates and Within-Rank Wage Gaps
+```{r}
+# build person-level dataset restricted to ever-Associate faculty
+ever_assoc_ids <- salary_clean %>%
+  group_by(id) %>%
+  filter(any(rank == "Assoc")) %>%
+  pull(id) %>%
+  unique()
+
+person_level <- salary_clean %>%
+  filter(id %in% ever_assoc_ids) %>%
+  arrange(id, year) %>%
+  group_by(id) %>%
+  summarise(
+    sex             = first(sex),
+    deg             = first(deg),
+    field           = first(field),
+    yrdeg           = first(yrdeg),
+    promoted        = as.integer(any(rank == "Full")),
+    yr_first_assoc  = min(year[rank == "Assoc"], na.rm = TRUE),
+    yr_first_full   = ifelse(any(rank == "Full"),
+                             min(year[rank == "Full"], na.rm = TRUE), NA_real_),
+    yrs_as_assoc    = ifelse(any(rank == "Full"),
+                             yr_first_full - yr_first_assoc, NA_real_),
+    sal_assoc_entry = salary[rank == "Assoc"][which.min(year[rank == "Assoc"])],
+    sal_assoc_last  = salary[rank == "Assoc"][which.max(year[rank == "Assoc"])],
+    sal_full_entry  = ifelse(any(rank == "Full"),
+                             salary[rank == "Full"][which.min(year[rank == "Full"])],
+                             NA_real_),
+    .groups = "drop"
+  )
+```
+
+```{r}
+cat("Promotion rates by sex:\n")
+person_level %>%
+  group_by(sex) %>%
+  summarise(
+    n          = n(),
+    n_promoted = sum(promoted),
+    pct        = round(100 * mean(promoted), 1),
+    .groups = "drop"
+  ) %>%
+  print()
+
+ct <- table(Sex = person_level$sex, Promoted = person_level$promoted)
+colnames(ct) <- c("Not Promoted", "Promoted")
+cat("\nContingency table:\n")
+print(ct)
+cat("\nRow proportions:\n")
+print(round(prop.table(ct, margin = 1), 3))
+
+cat("\nMedian time as Associate before promotion:\n")
+person_level %>%
+  filter(promoted == 1) %>%
+  group_by(sex) %>%
+  summarise(median_yrs = median(yrs_as_assoc, na.rm = TRUE), .groups = "drop") %>%
+  print()
+```
+```{r}
+# promotion rate bar chart
+ggplot(person_level %>% group_by(sex) %>% summarise(pct = mean(promoted)),
+       aes(x = sex, y = pct, fill = sex)) +
+  geom_col(width = 0.5, alpha = 0.8) +
+  scale_fill_manual(values = sex_colours) +
+  scale_y_continuous(labels = percent_format(accuracy = 1), limits = c(0, 0.75)) +
+  labs(title = "Promotion Rate (Associate to Full) by Sex",
+       x = "Sex", y = "Proportion promoted by 1995")
+
+# salary at Associate entry by sex
+ggplot(person_level, aes(x = sex, y = sal_assoc_entry, fill = sex)) +
+  geom_boxplot(alpha = 0.8) +
+  scale_fill_manual(values = sex_colours) +
+  labs(title = "Salary at Associate Entry by Sex",
+       x = "Sex", y = "Monthly salary ($)")
+
+# salary gain at promotion by sex
+ggplot(person_level %>% filter(promoted == 1) %>%
+         mutate(sal_gain = sal_full_entry - sal_assoc_last),
+       aes(x = sex, y = sal_gain, fill = sex)) +
+  geom_boxplot(alpha = 0.8) +
+  scale_fill_manual(values = sex_colours) + 
+  geom_hline(yintercept = 0, linetype = "dashed", colour = "grey50") +
+  labs(title = "Salary Gain at Promotion by Sex",
+       x = "Sex", y = "Salary gain ($)")
+
+# time as Associate before promotion
+ggplot(person_level %>% filter(promoted == 1),
+       aes(x = yrs_as_assoc, fill = sex)) +
+  geom_histogram(alpha = 0.6, bins = 15, position = "identity") +
+  scale_fill_manual(values = sex_colours) +
+  labs(title = "Years as Associate Before Promotion",
+       x = "Years", y = "Count")
+```
+```{r}
+# two-sample z-test for difference in promotion proportions
+nF <- sum(person_level$sex == "F")
+nM <- sum(person_level$sex == "M")
+kF <- sum(person_level$sex == "F" & person_level$promoted == 1)
+kM <- sum(person_level$sex == "M" & person_level$promoted == 1)
+pF <- kF / nF
+pM <- kM / nM
+
+p_pool <- (kF + kM) / (nF + nM)
+se_z   <- sqrt(p_pool * (1 - p_pool) * (1/nF + 1/nM))
+z_stat <- (pF - pM) / se_z
+p_val  <- 2 * pnorm(-abs(z_stat))
+
+se_diff <- sqrt(pF*(1-pF)/nF + pM*(1-pM)/nM)
+ci_lo   <- (pF - pM) - 1.96 * se_diff
+ci_hi   <- (pF - pM) + 1.96 * se_diff
+
+cat(sprintf("pF = %.4f  (%d/%d)\n", pF, kF, nF))
+cat(sprintf("pM = %.4f  (%d/%d)\n", pM, kM, nM))
+cat(sprintf("Difference pF - pM = %+.4f\n", pF - pM))
+cat(sprintf("95%% CI: (%.4f, %.4f)\n", ci_lo, ci_hi))
+cat(sprintf("z = %.3f,  p = %.4f\n", z_stat, p_val))
+
+cat("\nEquivalent chi-square test:\n")
+print(chisq.test(ct, correct = FALSE))
+```
+
+```{r}
+# logistic regression for probability of promotion by 1995
+q2_logit <- glm(
+  promoted ~ sex + field + yrdeg + deg,
+  data   = person_level,
+  family = binomial(link = "logit")
+)
+cat("Logistic regression — promotion outcome:\n")
+summary(q2_logit)
+
+cat("\nOdds ratios (95% CI):\n")
+exp(cbind(OR = coef(q2_logit), confint(q2_logit))) %>%
+  round(3) %>%
+  print()
+```
+
+```{r}
+# log-salary regression within rank to estimate adjusted wage gap by sex
+for (rnk in c("Assoc", "Full")) {
+  sub <- salary_clean %>%
+    filter(rank == rnk, salary > 0) %>%
+    mutate(log_salary = log(salary), years_exp = year - startyr)
+
+  fit <- lm(
+    log_salary ~ sex + yrdeg + year + admin + years_exp + field + deg,
+    data = sub
+  )
+
+  cat(sprintf("\nQ2 log-salary regression — %s rank (n = %d):\n", rnk, nrow(sub)))
+  summary(fit)
+
+  cat("\nWith robust SE:\n")
+  print(coeftest(fit, vcov = vcovHC(fit, type = "HC1")))
+
+  coef_f <- coef(fit)["sexF"]
+  cat(sprintf("Approximate percent difference for women in salary: %.1f%%\n",
+              (exp(coef_f) - 1) * 100))
+}
+```
+
+
 ## 5. Q3: Overall salary discrimination
 ```{r}
 # avoid longitudinal methods by using one row per faculty (latest salary)
@@ -313,6 +484,7 @@ latest_salary %>%
 
 ggplot(latest_salary, aes(x = sex, y = salary, fill = sex)) +
   geom_boxplot(alpha = 0.8) +
+  scale_fill_manual(values = sex_colours) +
   facet_wrap(~ rank, scales = "free_y") +
   labs(
     title = "Latest Salary by Sex Within Rank",
@@ -322,6 +494,7 @@ ggplot(latest_salary, aes(x = sex, y = salary, fill = sex)) +
 
 ggplot(latest_salary, aes(x = salary, fill = sex)) +
   geom_density(alpha = 0.4) +
+  scale_fill_manual(values = sex_colours) + 
   facet_wrap(~ rank, scales = "free") +
   labs(
     title = "Latest Salary Density by Sex Within Rank",
