@@ -107,13 +107,11 @@ salary_arc <- salary_clean %>%
     )
   )
 
-addResourcePath("app-inputs", "app-inputs")
-
 #-------------------------------
 # UI
 #-------------------------------
 ui <- navbarPage(
-  title = "Faculty Salary Explorer",
+  title = "DATA 557 W26 Final Group Project",
 
   # ══════════════════════════════════════════════════
   #  OVERVIEW TAB — Cherry Blossom Edition
@@ -226,7 +224,7 @@ ui <- navbarPage(
           margin:0 0 26px; letter-spacing:1px; line-height:1.15;
         }
         .hero-tagline {
-          font-family:'Playfair Display',Georgia,serif; font-style:italic;
+          font-family:'Playfair Display',Georgia,serif; font-style:normal;
           font-size:clamp(1em,2.2vw,1.3em); color:#ffc8d8;
           max-width:640px; line-height:1.95; margin:0 auto 10px;
         }
@@ -314,7 +312,7 @@ ui <- navbarPage(
         }
         .c-question {
           color:#ffe8f0; font-family:'Playfair Display',Georgia,serif;
-          font-style:italic; font-size:1.02em; line-height:1.85; margin:0;
+          font-style:normal; font-size:1.02em; line-height:1.85; margin:0;
         }
 
         /* ─── STORY SECTION ─── */
@@ -530,22 +528,6 @@ ui <- navbarPage(
           to { transform: rotate(360deg); }
         }
 
-        /* ─── AUDIO HINT ─── */
-        #audio-hint {
-          position:fixed; bottom:22px; left:26px;
-          font-family:'Inter',sans-serif; font-size:0.6em;
-          letter-spacing:3px; text-transform:uppercase;
-          color:rgba(255,183,197,0.5); z-index:9000;
-          pointer-events:none; transition:opacity 1.2s ease;
-          animation:hintPulse 5s ease-in-out 1.5s both;
-        }
-        @keyframes hintPulse {
-          0%   { opacity:0; }
-          25%  { opacity:0.75; }
-          75%  { opacity:0.75; }
-          100% { opacity:0.3; }
-        }
-
         /* ─── SCROLL REVEAL ─── */
         .reveal { opacity:0; transform:translateY(32px); }
         .reveal.visible {
@@ -632,32 +614,12 @@ ui <- navbarPage(
       tags$script(HTML("
         $(document).ready(function () {
 
-          /* ════════════════════════════════════════════════════════
-             PETAL SYSTEM  —  rAF loop, activity-driven
-             Petals drift W→E with gentle swirl.
-             They MOVE only while the user scrolls or moves the mouse.
-             On idle they glide smoothly to a halt (no abrupt stop).
-             12 petals start pre-placed in the viewport so the user
-             sees them frozen on load — they wake when activity begins.
-          ════════════════════════════════════════════════════════ */
+          /* PETAL SYSTEM — petals drift once on load for 5 seconds, then stop */
           var PKS = '#FFB7C5,#FF93AC,#FFADC5,#FFC2D1,#FF85A1,#FFD1DC,#FFAAB5,#FFA0BD,#FFD6E0,#FF78A5,#FFBDD0'.split(',');
           var petalPool    = [];
           var petalSpd     = 0;
           var petalTgt     = 0;
           var petalTmr     = null;
-          var petalEnabled = true;   /* false when user is on Q1-Q4 tabs */
-
-          /* ── Activity detection (Overview only) ── */
-          function petalWake() {
-            if (!petalEnabled) return;
-            petalTgt = 1;
-            clearTimeout(petalTmr);
-            petalTmr = setTimeout(function () {
-              petalTgt = 0;
-            }, 1800);
-          }
-          $(window).on('scroll.petals', petalWake);
-          $(document).on('mousemove.petals touchmove.petals', petalWake);
 
           /* ── Build one petal DOM element + physics object ── */
           function makePetal(prePlace) {
@@ -744,9 +706,16 @@ ui <- navbarPage(
             requestAnimationFrame(petalLoop);
           })();
 
-          /* Auto-wake on load (Overview is default tab) */
           petalTgt = 1;
-          petalTmr = setTimeout(function () { petalTgt = 0; }, 4000);
+          setTimeout(function () {
+            petalTgt = 0;
+          
+            for (var pi = 0; pi < petalPool.length; pi++) {
+              petalPool[pi].el.style.transition = 'opacity 0.8s ease';
+              petalPool[pi].opacity = 0;
+              petalPool[pi].el.style.opacity = '0';
+            }
+          }, 4200);
 
           /* ── Scroll-triggered reveals ── */
           var $win = $(window);
@@ -808,92 +777,6 @@ ui <- navbarPage(
             $('.pdl-2').css('transform', 'translateY(' + (sy * 0.16) + 'px)');
             $('.pdl-3').css('transform', 'translateY(' + (sy * 0.28) + 'px)');
           });
-
-          /* ── Tab detection: petals only on Overview ── */
-          function onTabChange(label) {
-            var isOverview = (label === 'Overview');
-            petalEnabled = isOverview;
-            if (!isOverview) {
-              /* Kill speed immediately and make every petal invisible.
-                 Reset positions so they re-enter cleanly on Overview return. */
-              petalTgt = 0;
-              petalSpd = 0;
-              clearTimeout(petalTmr);
-              for (var pi = 0; pi < petalPool.length; pi++) {
-                petalPool[pi].opacity = 0;
-                petalPool[pi].el.style.opacity = '0';
-                petalPool[pi].y = -28;
-                petalPool[pi].x = (Math.random() * 0.7 - 0.1) * window.innerWidth;
-              }
-            } else {
-              petalWake();
-            }
-          }
-          $(document).on('shown.bs.tab', 'a[data-toggle=\"tab\"]', function (e) {
-            onTabChange($(e.target).text().trim());
-          });
-
-          /* ── Background music ──────────────────────────────────────────
-             Chrome's autoplay policy only honours genuine user gestures:
-               wheel, click, mousedown, keydown, touchstart.
-             scroll and mousemove are NOT recognised — that is why the old
-             code was silent.  We now use the correct event set, show a
-             tiny non-intrusive hint, and remove everything once music
-             is playing.                                                  */
-          var blossomAudio = document.getElementById('blossom-audio');
-          if (blossomAudio) {
-            blossomAudio.volume = 0.4;
-            blossomAudio.loop   = true;
-
-            /* Build the subtle hint element via JS so no extra HTML is needed */
-            var aHint = document.createElement('div');
-            aHint.id        = 'audio-hint';
-            aHint.innerHTML = '&#9834;&nbsp;scroll to play';
-            document.body.appendChild(aHint);
-
-            var audioPlaying = false;
-            /* Events Chrome actually counts as user gestures for media */
-            var audioEvts = ['wheel','click','mousedown','keydown','touchstart'];
-
-            function tryPlayAudio() {
-              if (audioPlaying) return;
-              blossomAudio.play()
-                .then(function () {
-                  audioPlaying = true;
-                  /* clean up every listener */
-                  audioEvts.forEach(function (ev) {
-                    document.removeEventListener(ev, tryPlayAudio, true);
-                  });
-                  /* fade-out and remove the hint */
-                  aHint.style.opacity = '0';
-                  setTimeout(function () {
-                    if (aHint.parentNode) aHint.parentNode.removeChild(aHint);
-                  }, 1200);
-                })
-                .catch(function () {
-                  /* Still blocked (very locked-down browser) — tell user to click */
-                  if (!audioPlaying) aHint.textContent = '♪ click anywhere for music';
-                });
-            }
-
-            /* Attach to every recognised-gesture event */
-            audioEvts.forEach(function (ev) {
-              document.addEventListener(ev, tryPlayAudio, { capture: true, passive: true });
-            });
-
-            /* Also attempt immediate play — works when the browser has granted
-               autoplay permission for the domain (high Media-Engagement Index) */
-            blossomAudio.play()
-              .then(function () {
-                audioPlaying = true;
-                aHint.style.display = 'none';
-                audioEvts.forEach(function (ev) {
-                  document.removeEventListener(ev, tryPlayAudio, true);
-                });
-              })
-              .catch(function () { /* expected — hint is already visible */ });
-          }
-
         });
       "))
     ),
@@ -907,13 +790,12 @@ ui <- navbarPage(
         div(class = "h-orb h-orb-c pdl-3"),
 
         div(class = "hero-content",
-          p(class = "hero-eyebrow", "A Faculty Salary Study"),
-          h1(class = "hero-title", "Faculty Salary Explorer"),
+          h1(class = "hero-title", "Gender Differences in Faculty Salaries"),
           p(class = "hero-tagline",
-            "What does fair pay look like in academia?",
+            "Do gender differences appear in faculty pay?",
             tags$br(),
-            "A decade of salary records invites us to look beyond the numbers",
-            "and ask harder questions about who earns what and why."
+            "Two decades of salary records allow us to examine how compensation",
+            "varies across gender, experience, rank, field, and administrative roles."
           )
         ),
         div(class = "scroll-cue", "scroll", div(class = "scroll-cue-line"))
@@ -921,66 +803,28 @@ ui <- navbarPage(
 
       # ════ CURIOSITY ════
       div(class = "curiosity-section",
-        p(class = "s-eyebrow", "Three Questions Worth Asking"),
-        h2(class = "s-heading",
-           "The data holds answers.", tags$br(),
-           "But first, sit with the questions."
-        ),
+        p(class = "s-eyebrow", "Questions of Interest"),
         div(class = "curiosity-grid",
           div(class = "c-card",
             span(class = "c-number", "01"),
             p(class = "c-question",
-              "When two equally qualified candidates begin their academic careers,",
-              "does their first paycheck reflect credentials alone",
-              "or something less visible?"
+              "Does wage discrimination exist in the starting salaries of",
+              "faculty members (i.e., salaries in the year hired)?"
             )
           ),
           div(class = "c-card",
             span(class = "c-number", "02"),
             p(class = "c-question",
-              "Promotion from Associate to Full Professor is a milestone",
-              "earned through years of scholarship.",
-              "Does the salary reward match the effort for everyone who reaches it?"
+              "Does wage discrimination exist in granting promotions from ",
+              "Associate Professor to Full Professor?"
             )
           ),
           div(class = "c-card",
             span(class = "c-number", "03"),
             p(class = "c-question",
-              "A career in academia spans decades.",
-              "Over that time, do early salary differences shrink",
-              "as merit accumulates, or do they quietly grow year after year?"
+              "Overall, how would you answer the question: Is there wage",
+              "discrimination in salaries at the university?"
             )
-          )
-        )
-      ),
-
-      # ════ STORY ════
-      div(class = "story-section",
-        div(class = "story-inner",
-          p(class = "s-eyebrow", "The Dataset"),
-          h2(class = "story-heading",
-             "Hundreds of careers.", tags$br(),
-             "One quiet question about equity."
-          ),
-          p(class = "story-para",
-            "Tucked within hundreds of salary records spanning more than a decade,",
-            "a quiet story unfolds. Faculty members across three academic disciplines",
-            "built careers, earned promotions, and watched their paychecks evolve year after year."
-          ),
-          p(class = "story-para",
-            "The numbers seem straightforward at first glance. But look closer.",
-            "Who earns more when they first walk through the door?",
-            "Does a promotion carry the same financial weight for everyone?",
-            "After years in the field, do salary paths converge or drift further apart?"
-          ),
-          div(class = "story-callout",
-            p("These are not just statistical questions. They are questions about equity,",
-              "opportunity, and the invisible forces that shape academic careers.")
-          ),
-          p(class = "story-para",
-            "Each tab in this app peels back one layer of that story.",
-            "Start with hiring. Move to promotions. Trace the full arc of a career.",
-            "Let the patterns speak."
           )
         )
       ),
@@ -1006,83 +850,7 @@ ui <- navbarPage(
             tableOutput("overview_field")
           )
         )
-      ),
-
-      # ════ RESOURCES ════
-      div(class = "resources-section",
-        p(class = "s-eyebrow", "Project Documents"),
-        h2(class = "s-heading", "Explore the full research journey"),
-        div(class = "resources-grid",
-
-          tags$a(class="r-card", href="app-inputs/Final-Proj-Code.pdf", target="_blank",
-            # PDF icon (SVG, no emoji)
-            tags$svg(class="r-doc-icon", viewBox="0 0 44 54", xmlns="http://www.w3.org/2000/svg",
-              tags$rect(x="0",y="0",width="36",height="50",rx="4",fill="rgba(255,183,197,0.25)",stroke="rgba(255,183,197,0.5)",`stroke-width`="1.5"),
-              tags$polygon(points="36,0 44,8 36,8",fill="rgba(255,147,172,0.4)"),
-              tags$line(x1="8",y1="20",x2="28",y2="20",stroke="#ffb7c5",`stroke-width`="2",`stroke-linecap`="round"),
-              tags$line(x1="8",y1="28",x2="28",y2="28",stroke="#ffb7c5",`stroke-width`="2",`stroke-linecap`="round"),
-              tags$line(x1="8",y1="36",x2="20",y2="36",stroke="#ffb7c5",`stroke-width`="2",`stroke-linecap`="round")
-            ),
-            p(class="r-name","Final Project Code"),
-            span(class="r-type","PDF")
-          ),
-
-          tags$a(class="r-card", href="app-inputs/annotated-Milestone%201_%20Project%20Proposal.pdf", target="_blank",
-            tags$svg(class="r-doc-icon", viewBox="0 0 44 54", xmlns="http://www.w3.org/2000/svg",
-              tags$rect(x="0",y="0",width="36",height="50",rx="4",fill="rgba(255,183,197,0.25)",stroke="rgba(255,183,197,0.5)",`stroke-width`="1.5"),
-              tags$polygon(points="36,0 44,8 36,8",fill="rgba(255,147,172,0.4)"),
-              tags$line(x1="8",y1="20",x2="28",y2="20",stroke="#ffb7c5",`stroke-width`="2",`stroke-linecap`="round"),
-              tags$line(x1="8",y1="28",x2="28",y2="28",stroke="#ffb7c5",`stroke-width`="2",`stroke-linecap`="round"),
-              tags$line(x1="8",y1="36",x2="20",y2="36",stroke="#ffb7c5",`stroke-width`="2",`stroke-linecap`="round")
-            ),
-            p(class="r-name","Milestone 1 Project Proposal"),
-            span(class="r-type","PDF")
-          ),
-
-          tags$a(class="r-card", href="app-inputs/annotated-chicago_milestone2_557%20(1).pdf", target="_blank",
-            tags$svg(class="r-doc-icon", viewBox="0 0 44 54", xmlns="http://www.w3.org/2000/svg",
-              tags$rect(x="0",y="0",width="36",height="50",rx="4",fill="rgba(255,183,197,0.25)",stroke="rgba(255,183,197,0.5)",`stroke-width`="1.5"),
-              tags$polygon(points="36,0 44,8 36,8",fill="rgba(255,147,172,0.4)"),
-              tags$line(x1="8",y1="20",x2="28",y2="20",stroke="#ffb7c5",`stroke-width`="2",`stroke-linecap`="round"),
-              tags$line(x1="8",y1="28",x2="28",y2="28",stroke="#ffb7c5",`stroke-width`="2",`stroke-linecap`="round"),
-              tags$line(x1="8",y1="36",x2="20",y2="36",stroke="#ffb7c5",`stroke-width`="2",`stroke-linecap`="round")
-            ),
-            p(class="r-name","Milestone 2 Chicago Review"),
-            span(class="r-type","PDF")
-          ),
-
-          tags$a(class="r-card", href="app-inputs/annotated-milestone3_chicago_557.pdf", target="_blank",
-            tags$svg(class="r-doc-icon", viewBox="0 0 44 54", xmlns="http://www.w3.org/2000/svg",
-              tags$rect(x="0",y="0",width="36",height="50",rx="4",fill="rgba(255,183,197,0.25)",stroke="rgba(255,183,197,0.5)",`stroke-width`="1.5"),
-              tags$polygon(points="36,0 44,8 36,8",fill="rgba(255,147,172,0.4)"),
-              tags$line(x1="8",y1="20",x2="28",y2="20",stroke="#ffb7c5",`stroke-width`="2",`stroke-linecap`="round"),
-              tags$line(x1="8",y1="28",x2="28",y2="28",stroke="#ffb7c5",`stroke-width`="2",`stroke-linecap`="round"),
-              tags$line(x1="8",y1="36",x2="20",y2="36",stroke="#ffb7c5",`stroke-width`="2",`stroke-linecap`="round")
-            ),
-            p(class="r-name","Milestone 3 Chicago Review"),
-            span(class="r-type","PDF")
-          )
-        ),
-
-        div(class = "cherry-footer",
-          tags$img(
-            src    = "University-of-Washington-Logo.png",
-            alt    = "University of Washington",
-            height = "36px",
-            style  = "opacity:0.55; filter:brightness(0) invert(1); margin-bottom:8px; display:block; margin-left:auto; margin-right:auto;"
-          ),
-          "DATA 557 \u00B7 Faculty Salary Analysis \u00B7 University of Washington"
-        )
       )
-    ),
-
-    # Hidden background audio — persists across all tabs, autoplays on first interaction
-    tags$audio(
-      id      = "blossom-audio",
-      loop    = NA,
-      preload = "auto",
-      style   = "display:none;",
-      tags$source(src = "c_blossoms.mp3", type = "audio/mpeg")
     )
   ),
 
@@ -1171,7 +939,12 @@ ui <- navbarPage(
               verbatimTextOutput("q1_lm_out"),
               hr(),
               h5("Log-salary model with robust SE (coefficient for sex approximates percent difference)"),
-              verbatimTextOutput("q1_lm_log_robust")
+              verbatimTextOutput("q1_lm_log_robust"),
+              br(),
+              p(
+                strong("Approximate percent difference for women in starting salary: "),
+                "-4.85%"
+              )
             )
           )
         )
@@ -1226,7 +999,7 @@ ui <- navbarPage(
               h5("Percent raise with same predictors (robust SE)"),
               verbatimTextOutput("q2_lm_pct")
             ),
-            tabPanel("Promotion Rates",
+            tabPanel("Extension: Promotion Rates",
               br(),
               p(style = "color:#666;",
                 "Among those who were ever Associate Professors, the share who were later promoted to Full:"),
@@ -1348,11 +1121,13 @@ ui <- navbarPage(
 
       div(class = "q4-hero",
         h3("Q4: What limits generalizing these results?"),
-        p("Every statistical conclusion rests on assumptions and a specific context.
-           Before acting on the patterns found in Q1 through Q3, it is essential to
-           ask: where do these findings hold, and where might they break down?
-           This tab lays out the study boundaries, the assumptions we relied on,
-           and what the results can and cannot tell us beyond this dataset.")
+        p("Every statistical conclusion depends on assumptions and the context 
+          in which the data were collected. Before drawing broader implications 
+          from the patterns observed in Q1 through Q3, it is important to 
+          consider where these findings are likely to apply and where they may 
+          not. This section outlines the scope of the study, the assumptions 
+          underlying the analysis, and what the results can—and cannot—tell us 
+          beyond this dataset.")
       ),
 
       fluidRow(
@@ -1423,22 +1198,13 @@ ui <- navbarPage(
           div(class = "q4-section",
             h4("What Can Be Generalized?"),
             div(class = "q4-card",
-              strong("Pattern, not magnitude."),
-              p(style = "margin: 6px 0 0;",
-                "The direction of the gap (women earning less) is consistent
-                 across all three questions and multiple model specifications.
-                 The exact dollar or percent figure should not be extrapolated
-                 to other universities, but the direction and presence of a gap
-                 is a robust pattern across models.")
-            ),
-            div(class = "q4-card",
               strong("Gap structure matters more than a single number."),
               p(style = "margin: 6px 0 0;",
                 "The most informative finding is where the gap appears:
                  at hire (starting pay), in promotion rates, and within rank,
                  but not necessarily in the raise size at promotion.
                  This structure suggests salary equity cannot be achieved
-                 by equalizaing raises alone.")
+                 by equalizing raises alone.")
             ),
             div(class = "q4-card",
               strong("Administrative roles amplify the gap."),
@@ -1447,20 +1213,7 @@ ui <- navbarPage(
                  administrators. If women are less likely to hold admin roles
                  (and the data support this), the compounding effect
                  is structural, not a single salary event.")
-            ),
-            div(class = "q4-card",
-              strong("Alpha = 0.05, two-sided throughout."),
-              p(style = "margin: 6px 0 0;",
-                "All formal tests use a significance level of 5 percent.
-                 Non-significant results (such as the dollar raise at promotion)
-                 do not prove equality; they only fail to detect a difference
-                 at this threshold with the available sample size.")
             )
-          ),
-
-          div(class = "q4-section",
-            h4("Data Snapshot"),
-            tableOutput("q4_scope_tbl")
           )
         )
       )
@@ -1510,9 +1263,9 @@ ui <- navbarPage(
 
           h4("Median Salary at Each Career Stage"),
           p(style = "color:#666; font-size:0.92em; margin-bottom:8px;",
-            "Breaking the career into four stages shows",
-            "whether the salary gap is stable or growing.",
-            "A widening spread across stages is the signature of compounding inequality."
+            "This chart compares median salaries for male and female faculty",
+            "within broad experience stages; it summarizes all observations",
+            "in each stage."
           ),
           plotOutput("q4_stage_bars", height = "300px"),
           br(),
@@ -1520,8 +1273,8 @@ ui <- navbarPage(
           h4("The Administrative Salary Premium"),
           p(style = "color:#666; font-size:0.92em; margin-bottom:8px;",
             "Faculty in administrative roles often earn more.",
-            "If one group holds fewer such roles, that becomes",
-            "a compounding mechanism beyond rank or experience."
+            "The gender salary gap also appears larger among faculty",
+            "who hold administrative positions."
           ),
           plotOutput("q4_admin_box", height = "300px"),
           br(),
@@ -1893,10 +1646,11 @@ server <- function(input, output, session) {
         ),
         p(style = "margin:0; color:#3d1020; font-style:italic; font-size:1.04em;",
           paste0(
-            "In the early career (0 to 4 years), female faculty earn ",
-            early_ratio, "% of male colleagues\u2019 median salary. ",
-            "By 15 or more years in, that figure becomes ",
-            late_ratio, "%. The gap ", direction, " over a career."
+            "Early in the career, male and female salary trajectories rise at 
+            similar rates. After roughly 20 years of experience, the paths begin 
+            to diverge: male salaries continue to increase, while the female 
+            trajectory flattens slightly. As a result, the gap between the 
+            curves widens in later career stages."
           )
         )
       )
