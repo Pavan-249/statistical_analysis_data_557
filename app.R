@@ -117,7 +117,7 @@ ui <- navbarPage(
   #  OVERVIEW TAB — Cherry Blossom Edition
   # ══════════════════════════════════════════════════
   tabPanel(
-    "Overview",
+    "Introduction",
 
     tags$head(
       tags$link(rel = "preconnect", href = "https://fonts.googleapis.com"),
@@ -858,7 +858,7 @@ ui <- navbarPage(
   #  Explore Data (EDA — NEW)
   # ══════════════════════════════════════════════════
   tabPanel(
-    "Explore Data",
+    "Exploratory Data Analysis",
     fluidPage(
       sidebarLayout(
         sidebarPanel(
@@ -1071,7 +1071,7 @@ ui <- navbarPage(
   #  Q4: Limitations & Generalizability (NEW)
   # ══════════════════════════════════════════════════
   tabPanel(
-    "Q4: Scope & Limits",
+    "Q4 and Summary of the Findings",
     fluidPage(
       tags$style(HTML("
         .q4-hero {
