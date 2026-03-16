@@ -139,7 +139,7 @@ ui <- fluidPage(
         tabPanel("Home",
                  fluidPage(
                    h2("Gender pay disparities in faculty salaries"),
-                   p(em("DATA 557 — Explore how we analyzed the data and what we found.")),
+                   p(em("DATA 557: Explore how we analyzed the data and what we found.")),
                    p(strong("Authors:"), "Maanya Cola Bharath, Roxanne Dimadi, Ha Tien Nguyen, Hannah Sun, Pavan Suresh, Lay Yang"),
                    p("Use the tabs above to move through the analysis step by step. The sidebar filter applies to all plots: choose Both to compare men and women, or Male only / Female only to focus on one group. Hover on any plot for exact values.", class = "instruction"),
                    hr(),
