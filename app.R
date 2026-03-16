@@ -1295,6 +1295,179 @@ ui <- navbarPage(
   ),
 
   # ══════════════════════════════════════════════════
+  #  Q4: Limitations & Generalizability (NEW)
+  # ══════════════════════════════════════════════════
+  tabPanel(
+    "Q4: Scope & Limits",
+    fluidPage(
+      tags$style(HTML("
+        .q4-hero {
+          background: linear-gradient(135deg, #fff0f5 0%, #ffe4ed 60%, #ffd6e4 100%);
+          border-radius: 14px;
+          padding: 32px 36px 24px;
+          margin-bottom: 28px;
+          border-left: 5px solid #E05C5C;
+        }
+        .q4-hero h3 { color: #3d1020; margin-top: 0; font-size: 1.45em; }
+        .q4-hero p  { color: #5a2030; font-size: 1.04em; line-height: 1.65; margin-bottom: 0; }
+        .q4-section { margin-bottom: 32px; }
+        .q4-section h4 {
+          color: #3d1020; border-bottom: 2px solid #ffb7c5;
+          padding-bottom: 6px; margin-bottom: 16px; font-size: 1.15em;
+        }
+        .q4-card {
+          background: #fff8fa; border-radius: 10px;
+          border: 1px solid #ffd6e4; padding: 18px 22px;
+          margin-bottom: 14px;
+        }
+        .q4-card strong { color: #c23355; }
+        .q4-finding {
+          background: #fff0f5; border-radius: 10px;
+          border-left: 4px solid #E05C5C; padding: 14px 20px;
+          margin-bottom: 12px; font-size: 0.97em; color: #3d1020;
+          line-height: 1.6;
+        }
+        .q4-finding .tag {
+          font-size: 0.72em; font-weight: 600; letter-spacing: 2px;
+          text-transform: uppercase; color: #E05C5C; display: block;
+          margin-bottom: 4px;
+        }
+        .q4-limit-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+        .q4-limit-card {
+          flex: 1 1 240px; background: #fff8fa;
+          border-radius: 10px; padding: 16px 18px;
+          border: 1px solid #ffd6e4; font-size: 0.94em; color: #4a1a2a;
+          line-height: 1.6;
+        }
+        .q4-limit-card .lim-title {
+          font-weight: 600; color: #c23355; font-size: 0.92em;
+          letter-spacing: 1.5px; text-transform: uppercase;
+          display: block; margin-bottom: 6px;
+        }
+      ")),
+
+      div(class = "q4-hero",
+        h3("Q4: What limits generalizing these results?"),
+        p("Every statistical conclusion rests on assumptions and a specific context.
+           Before acting on the patterns found in Q1 through Q3, it is essential to
+           ask: where do these findings hold, and where might they break down?
+           This tab lays out the study boundaries, the assumptions we relied on,
+           and what the results can and cannot tell us beyond this dataset.")
+      ),
+
+      fluidRow(
+        column(7,
+          div(class = "q4-section",
+            h4("Key Findings Across All Questions"),
+            uiOutput("q4_findings_banner")
+          ),
+
+          div(class = "q4-section",
+            h4("Study Limitations"),
+            div(class = "q4-limit-row",
+              div(class = "q4-limit-card",
+                span(class = "lim-title", "Single Institution"),
+                "Data come from one anonymous U.S. university observed between
+                 1976 and 1995. Salary policies, hiring cultures, and
+                 promotion norms vary widely across institutions,
+                 so findings may not hold at other universities."
+              ),
+              div(class = "q4-limit-card",
+                span(class = "lim-title", "Historical Time Window"),
+                "The study covers two decades ending in 1995.
+                 Gender equity policies, pay transparency laws, and
+                 academic labor markets have changed substantially
+                 since then. Results describe a historical snapshot,
+                 not necessarily the present."
+              )
+            ),
+            div(class = "q4-limit-row",
+              div(class = "q4-limit-card",
+                span(class = "lim-title", "Missing Productivity Data"),
+                "The dataset contains no measures of research output,
+                 teaching evaluations, grant funding, or publication record.
+                 If these differ by sex and also influence salary, the models
+                 may still confound real productivity differences with a sex gap."
+              ),
+              div(class = "q4-limit-card",
+                span(class = "lim-title", "Observational Design"),
+                "This is not a randomized experiment. Even after controlling
+                 for rank, field, and experience, unmeasured confounders
+                 could account for part of the estimated gap. Causal
+                 language (women are paid less because of sex) is
+                 not fully supported by this design alone."
+              )
+            ),
+            div(class = "q4-limit-row",
+              div(class = "q4-limit-card",
+                span(class = "lim-title", "Linearity Assumption"),
+                "All regression models assume a linear (or log-linear)
+                 relationship between salary and predictors. If the true
+                 relationship is nonlinear (e.g., diminishing returns to
+                 experience, field-specific trends), the model estimates
+                 will be biased."
+              ),
+              div(class = "q4-limit-card",
+                span(class = "lim-title", "Independence of Observations"),
+                "Faculty appear multiple times across years in the panel.
+                 Treating repeated records as independent may underestimate
+                 standard errors. The analyses partially address this by
+                 using robust standard errors, but clustered SE by person
+                 would be the ideal approach."
+              )
+            )
+          )
+        ),
+
+        column(5,
+          div(class = "q4-section",
+            h4("What Can Be Generalized?"),
+            div(class = "q4-card",
+              strong("Pattern, not magnitude."),
+              p(style = "margin: 6px 0 0;",
+                "The direction of the gap (women earning less) is consistent
+                 across all three questions and multiple model specifications.
+                 The exact dollar or percent figure should not be extrapolated
+                 to other universities, but the direction and presence of a gap
+                 is a robust pattern across models.")
+            ),
+            div(class = "q4-card",
+              strong("Gap structure matters more than a single number."),
+              p(style = "margin: 6px 0 0;",
+                "The most informative finding is where the gap appears:
+                 at hire (starting pay), in promotion rates, and within rank,
+                 but not necessarily in the raise size at promotion.
+                 This structure suggests salary equity cannot be achieved
+                 by equalizaing raises alone.")
+            ),
+            div(class = "q4-card",
+              strong("Administrative roles amplify the gap."),
+              p(style = "margin: 6px 0 0;",
+                "The interaction model in Q3 shows the sex gap is larger among
+                 administrators. If women are less likely to hold admin roles
+                 (and the data support this), the compounding effect
+                 is structural, not a single salary event.")
+            ),
+            div(class = "q4-card",
+              strong("Alpha = 0.05, two-sided throughout."),
+              p(style = "margin: 6px 0 0;",
+                "All formal tests use a significance level of 5 percent.
+                 Non-significant results (such as the dollar raise at promotion)
+                 do not prove equality; they only fail to detect a difference
+                 at this threshold with the available sample size.")
+            )
+          ),
+
+          div(class = "q4-section",
+            h4("Data Snapshot"),
+            tableOutput("q4_scope_tbl")
+          )
+        )
+      )
+    )
+  ),
+
+  # ══════════════════════════════════════════════════
   #  Career Trajectories
   # ══════════════════════════════════════════════════
   tabPanel(
@@ -1585,6 +1758,65 @@ server <- function(input, output, session) {
   })
   output$q3_lm_interaction_robust <- renderPrint({
     coeftest(q3_lm_interaction_mdl(), vcov = vcovHC(q3_lm_interaction_mdl(), type = "HC1"))
+  })
+
+  # ── Q4: Scope & Limits ──
+  output$q4_scope_tbl <- renderTable({
+    salary_clean %>%
+      summarise(
+        "Total records"    = n(),
+        "Unique faculty"   = n_distinct(id),
+        "Years covered"    = paste(min(year), "to", max(year)),
+        "Salary range"     = paste0("$", round(min(salary)/1000,1), "k to $",
+                                   round(max(salary)/1000,1), "k")
+      )
+  }, striped = TRUE, bordered = TRUE, hover = TRUE)
+
+  output$q4_findings_banner <- renderUI({
+    # Compute live numbers from models
+    m_log_q1 <- lm(log_salary ~ sex + rank + field + yrdeg + startyr, data = start_salary)
+    cf_q1    <- coef(m_log_q1)["sexF"]
+    pct_q1   <- round((exp(cf_q1) - 1) * 100, 1)
+
+    m_log_q3 <- lm(log_salary ~ sex + rank + field + experience + admin, data = latest_salary)
+    cf_q3    <- coef(m_log_q3)["sexF"]
+    pct_q3   <- round((exp(cf_q3) - 1) * 100, 1)
+
+    m_base_q3 <- lm(salary ~ sex + rank + field + experience + admin, data = latest_salary)
+    dollar_q3 <- round(coef(m_base_q3)["sexF"], 0)
+
+    promo_tbl <- person_level %>%
+      group_by(sex) %>%
+      summarise(rate = round(mean(promoted) * 100, 1), .groups = "drop")
+    rate_m <- promo_tbl %>% filter(sex == "M") %>% pull(rate)
+    rate_f <- promo_tbl %>% filter(sex == "F") %>% pull(rate)
+
+    tagList(
+      div(class = "q4-finding",
+        span(class = "tag", "Q1: Starting Salary"),
+        paste0("After controlling for rank, field, degree year and hire year, female faculty
+                earned approximately ", abs(pct_q1),
+               "% less than male colleagues at the time of hire (log-salary model, robust SE).
+                The gap is present even before experience accumulates.")
+      ),
+      div(class = "q4-finding",
+        span(class = "tag", "Q2: Promotion Raises"),
+        paste0("The dollar and percent raises at the Associate to Full promotion step
+                do not differ significantly by sex (Welch t-test, Wilcoxon). However,
+                female faculty were promoted at a rate of ", rate_f,
+               "% versus ", rate_m,
+               "% for male faculty, a statistically significant difference (chi-squared test).
+                The inequality lies in access to promotion, not the raise itself.")
+      ),
+      div(class = "q4-finding",
+        span(class = "tag", "Q3: Overall (Latest) Salary"),
+        paste0("Controlling for rank, field, experience and administrative role, female faculty
+                earned approximately $", abs(dollar_q3),
+               " less per year in the baseline model, or about ", abs(pct_q3),
+               "% less in the log-salary model (robust SE).
+                The gap is even larger for faculty in administrative roles.")
+      )
+    )
   })
 
   # ── EDA ──
