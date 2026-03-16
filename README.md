@@ -8,14 +8,14 @@ An interactive Shiny app built for DATA 557 that explores salary equity across a
 
 ## What It Does
 
-The app analyzes a longitudinal faculty salary dataset spanning over a decade, asking four core questions:
+The app explores a longitudinal faculty salary dataset from 1976 to 1995 through four core questions about sex-based wage disparities in academia:
 
 | Tab | Question |
 |-----|----------|
-| **Q1: Starting Salary** | Do male and female faculty begin their careers at the same pay? |
-| **Q2: Promotion Raises** | Is the salary bump at promotion equal for everyone? |
-| **Q3: Latest Salary** | How do current salaries compare across ranks and sex? |
-| **Q4: Career Arc** | Does the salary gap widen, narrow, or hold steady over a full career? |
+| **Q1: Starting Salary** | Do men and women differ in starting salary at the time they enter the faculty? |
+| **Q2: Promotion Raises** | Do men and women receive different salary increases when promoted from Associate Professor to Full Professor? |
+| **Q3: Overall Salary** | In the most recent observed salary for each faculty member, do salary differences by sex remain after accounting for other factors? |
+| **Q4: Generalizability** | What limitations of the dataset and analysis affect how broadly these results can be interpreted? |
 
 ## Running Locally
 
@@ -26,10 +26,6 @@ install.packages(c("shiny", "tidyverse", "scales"))
 # Launch
 shiny::runApp("app.R")
 ```
-
-## Project Documents
-
-All milestone reports are in the `app-inputs/` folder and linked from the app's Overview page.
 
 ## Course
 
