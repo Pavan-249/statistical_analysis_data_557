@@ -468,6 +468,35 @@ ui <- navbarPage(
         }
         .resources-section .cherry-footer { background:transparent; }
 
+        /* ─── PLOT LOADING SPINNER ─── */
+        .shiny-plot-output,
+        .shiny-table-output { position: relative; }
+
+        .shiny-plot-output.recalculating::before {
+          content: '';
+          position: absolute; inset: 0;
+          background: rgba(255,248,250,0.72);
+          backdrop-filter: blur(4px);
+          z-index: 5;
+          border-radius: 10px;
+          transition: opacity 0.3s ease;
+        }
+        .shiny-plot-output.recalculating::after {
+          content: '';
+          position: absolute;
+          top: 50%; left: 50%;
+          width: 44px; height: 44px;
+          margin: -22px 0 0 -22px;
+          border: 3px solid rgba(255,183,197,0.3);
+          border-top-color: #ff93ac;
+          border-radius: 50%;
+          animation: plotSpin 0.75s linear infinite;
+          z-index: 6;
+        }
+        @keyframes plotSpin {
+          to { transform: rotate(360deg); }
+        }
+
         /* ─── AUDIO HINT ─── */
         #audio-hint {
           position:fixed; bottom:22px; left:26px;
@@ -752,8 +781,17 @@ ui <- navbarPage(
             var isOverview = (label === 'Overview');
             petalEnabled = isOverview;
             if (!isOverview) {
+              /* Kill speed immediately and make every petal invisible.
+                 Reset positions so they re-enter cleanly on Overview return. */
               petalTgt = 0;
+              petalSpd = 0;
               clearTimeout(petalTmr);
+              for (var pi = 0; pi < petalPool.length; pi++) {
+                petalPool[pi].opacity = 0;
+                petalPool[pi].el.style.opacity = '0';
+                petalPool[pi].y = -28;
+                petalPool[pi].x = (Math.random() * 0.7 - 0.1) * window.innerWidth;
+              }
             } else {
               petalWake();
             }
