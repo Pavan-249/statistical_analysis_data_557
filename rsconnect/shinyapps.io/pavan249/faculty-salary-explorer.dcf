@@ -5,6 +5,6 @@ account: pavan249
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 16903947
-bundleId: 11712668
+bundleId:
 url: https://pavan249.shinyapps.io/faculty-salary-explorer/
 version: 1
