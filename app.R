@@ -801,7 +801,7 @@ ui <- navbarPage(
                 })
                 .catch(function () {
                   /* Still blocked (very locked-down browser) — tell user to click */
-                  if (!audioPlaying) aHint.textContent = '\u266a click anywhere for music';
+                  if (!audioPlaying) aHint.textContent = '♪ click anywhere for music';
                 });
             }
 
