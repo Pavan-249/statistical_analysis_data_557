@@ -4,11 +4,11 @@ subtitle: "DATA 557 W26 Final Project - Interactive Data Story"
 author: "Maanya Cola Bharath, Roxanne Dimadi, Ha Tien Nguyen, Hannah Sun, Pavan Suresh, Lay Yang"
 date: "`r Sys.Date()`"
 output:
-  pdf_document: default
   html_document:
     toc: true
     toc_float: true
     toc_depth: 4
+  pdf_document: default
 ---
 
 ```{r, warning=FALSE, message=FALSE, include = FALSE}
@@ -16,6 +16,7 @@ library(tidyverse)
 library(lmtest)
 library(sandwich)
 library(scales)
+library(plotly)
 ```
 
 # 1. Introduction
@@ -114,7 +115,7 @@ We conduct a preliminary exploratory data analysis (EDA) to examine the structur
 We begin by examining the distribution of observations by gender. The dataset contains substantially more observations for men than for women. Although this imbalance does not invalidate statistical comparisons, it is important to recognize that differences in sample size may affect the variability of estimates and the precision of statistical tests.
 
 ```{r, echo = FALSE}
-salary_clean %>%
+p1 <- salary_clean %>%
   count(sex) %>%
   ggplot(aes(x = sex, y = n, fill = sex)) +
   geom_col(width = 0.6) +
@@ -124,6 +125,8 @@ salary_clean %>%
     x = "Sex",
     y = "Number of Records"
   )
+
+ggplotly(p1)
 ```
 
 ### Salary Trends Over Time by Sex
@@ -131,7 +134,7 @@ salary_clean %>%
 The time series plot shows that salaries increase steadily between 1976 and 1995 for both groups. Across all years, the average salary for men appears higher than that for women. At first galance, this pattern may suggest the presence of a gender wage gap. However, because academic salaries are strongly structured by rank, differences in the distribution of men and women across ranks could influence these aggregate averages. This possibility motivates a closer examination of salary distributions within each rank.
 
 ```{r, echo = FALSE, warning = FALSE, message = FALSE}
-salary_clean %>%
+p2 <- salary_clean %>%
   group_by(year, sex) %>%
   summarise(mean_salary = mean(salary), .groups = "drop") %>%
   ggplot(aes(x = year, y = mean_salary, color = sex)) +
@@ -142,6 +145,8 @@ salary_clean %>%
     x = "Year",
     y = "Average Salary"
   )
+
+ggplotly(p2)
 ```
 
 ### Salary Distribution by Sex Within Rank
@@ -149,7 +154,7 @@ salary_clean %>%
 The boxplots show that salaries increase substantially with rank, with Full Professors earning the highest salaries on average, followed by Associate Professors and then Assistant Professors. Within each rank, male and female salary distributions appear broadly similar, with the median female salary slightly higher in both Assistant and Associate groups. These patterns suggest that some observed salary differences may arise from differences in rank composition as well as potential within-rank wage gaps. This suggests an important statistical issue known as Simpson's paradox, where patterns observed in aggregate data can differ from patterns observed within subgroups. If men are disproportionately represented in higher-paying ranks, the overall average salary for men may appear higher even if salaries are similar within individual ranks.
 
 ```{r, echo = FALSE}
-ggplot(salary_clean, aes(x = sex, y = salary, fill = sex)) +
+p3 <- ggplot(salary_clean, aes(x = sex, y = salary, fill = sex)) +
   geom_boxplot(alpha = 0.8) +
   scale_fill_manual(values = sex_colours) +
   facet_wrap(~ rank, scales = "free_y") +
@@ -158,6 +163,8 @@ ggplot(salary_clean, aes(x = sex, y = salary, fill = sex)) +
     x = "Sex",
     y = "Monthly Salary"
   )
+
+ggplotly(p3)
 ```
 
 These exploratory plots emphasize the importance of accounting for rank when analyzing gender differences in salaries, which we address explicitly in our Question 2 analysis section.
@@ -217,7 +224,7 @@ par(mfrow = c(1, 1))
 We first examine the distribution of starting salaries separately for male and female faculty members. The histograms indicate that starting salaries for both groups follow a right-skewed distribution. While the overall shapes of the distributions are similar, the distribution for men shows a greater number of observations above \$5000.
 
 ```{r, echo = FALSE}
-ggplot(start_salary, aes(x = salary, fill = sex)) +
+p4 <- ggplot(start_salary, aes(x = salary, fill = sex)) +
   geom_histogram(alpha = 0.8, bins = 25, position = "identity") +
   scale_fill_manual(values = sex_colours) +
   facet_wrap(~ sex, scales = "free_y") +
@@ -226,6 +233,8 @@ ggplot(start_salary, aes(x = salary, fill = sex)) +
     x = "Starting Salary",
     y = "Count"
   )
+
+ggplotly(p4)
 ```
 
 ```{r, include = FALSE}
@@ -256,7 +265,7 @@ ggplot(start_salary, aes(x = factor(startyr), y = salary, fill = sex)) +
 The boxplots show that Professional fields exhibit the highest median starting salaries, followed by Other fields and then Arts fields. This suggests that academic field may play an important role in determining initial compensation. In both the Arts and Professional fields, the median starting salary for women are slightly higher than that for men, while the male median starting salary is slightly higher in the Other field. These patterns indicate that differences in starting salaries may vary across academic fields, highlighting the importance for controlling for field.
 
 ```{r, echo = FALSE}
-ggplot(start_salary, aes(x = field, y = salary, fill = sex)) +
+p5 <- ggplot(start_salary, aes(x = field, y = salary, fill = sex)) +
   geom_boxplot(alpha = 0.8, position = position_dodge(width = 0.75)) +
   scale_fill_manual(values = sex_colours) +
   labs(
@@ -265,6 +274,8 @@ ggplot(start_salary, aes(x = field, y = salary, fill = sex)) +
     y = "Starting Salary",
     fill = "Sex"
   )
+
+ggplotly(p5)
 ```
 
 ### Starting Salary by Sex, Rank, and Field
@@ -272,7 +283,7 @@ ggplot(start_salary, aes(x = field, y = salary, fill = sex)) +
 When starting salaries are examined jointly by rank and field, the median salary is not consistently higher for one gender across all groups. Notably, within the Professional field, women have higher median starting salaries than men at all three ranks (Assistant, Associate, and Full). In the Arts field and Other field, male median starting salaries are higher at Associate and Full ranks, while female median starting salary is higher at the Assistant rank. Therefore, both academic rank and field should be controlled for in subsequent analyses.
 
 ```{r, echo = FALSE}
-ggplot(start_salary, aes(x = sex, y = salary, fill = sex)) +
+p6 <- ggplot(start_salary, aes(x = sex, y = salary, fill = sex)) +
   geom_boxplot(alpha = 0.8) +
   scale_fill_manual(values = sex_colours) +
   facet_grid(rank ~ field) +
@@ -282,6 +293,8 @@ ggplot(start_salary, aes(x = sex, y = salary, fill = sex)) +
     y = "Starting Salary"
   ) +
   theme_minimal()
+
+ggplotly(p6)
 ```
 
 ### Statistical Tests
@@ -432,7 +445,7 @@ promotion_long <- promotion_data %>%
     values_to = "value"
   )
 
-ggplot(promotion_long, aes(x = sex, y = value, fill = sex)) +
+p7 <- ggplot(promotion_long, aes(x = sex, y = value, fill = sex)) +
   geom_boxplot(alpha = 0.8) +
   scale_fill_manual(values = sex_colours) +
   facet_wrap(
@@ -448,6 +461,8 @@ ggplot(promotion_long, aes(x = sex, y = value, fill = sex)) +
     x = "Sex",
     y = NULL
   )
+
+ggplotly(p7)
 ```
 
 ```{r, include = FALSE}
