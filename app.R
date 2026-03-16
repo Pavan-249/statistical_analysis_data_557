@@ -468,6 +468,22 @@ ui <- navbarPage(
         }
         .resources-section .cherry-footer { background:transparent; }
 
+        /* ─── AUDIO HINT ─── */
+        #audio-hint {
+          position:fixed; bottom:22px; left:26px;
+          font-family:'Inter',sans-serif; font-size:0.6em;
+          letter-spacing:3px; text-transform:uppercase;
+          color:rgba(255,183,197,0.5); z-index:9000;
+          pointer-events:none; transition:opacity 1.2s ease;
+          animation:hintPulse 5s ease-in-out 1.5s both;
+        }
+        @keyframes hintPulse {
+          0%   { opacity:0; }
+          25%  { opacity:0.75; }
+          75%  { opacity:0.75; }
+          100% { opacity:0.3; }
+        }
+
         /* ─── SCROLL REVEAL ─── */
         .reveal { opacity:0; transform:translateY(32px); }
         .reveal.visible {
@@ -563,17 +579,19 @@ ui <- navbarPage(
              sees them frozen on load — they wake when activity begins.
           ════════════════════════════════════════════════════════ */
           var PKS = '#FFB7C5,#FF93AC,#FFADC5,#FFC2D1,#FF85A1,#FFD1DC,#FFAAB5,#FFA0BD,#FFD6E0,#FF78A5,#FFBDD0'.split(',');
-          var petalPool  = [];
-          var petalSpd   = 0;      /* current interpolated speed  0–1   */
-          var petalTgt   = 0;      /* desired speed                      */
-          var petalTmr   = null;
+          var petalPool    = [];
+          var petalSpd     = 0;
+          var petalTgt     = 0;
+          var petalTmr     = null;
+          var petalEnabled = true;   /* false when user is on Q1-Q4 tabs */
 
-          /* ── Activity detection ── */
+          /* ── Activity detection (Overview only) ── */
           function petalWake() {
+            if (!petalEnabled) return;
             petalTgt = 1;
             clearTimeout(petalTmr);
             petalTmr = setTimeout(function () {
-              petalTgt = 0;   /* start smooth decel after 1.8 s of idle */
+              petalTgt = 0;
             }, 1800);
           }
           $(window).on('scroll.petals', petalWake);
@@ -664,9 +682,7 @@ ui <- navbarPage(
             requestAnimationFrame(petalLoop);
           })();
 
-          /* Auto-wake on page load: petals drift for 4 s so user sees the effect
-             immediately without needing to scroll first.
-             After that they respond only to scroll / mouse-move.           */
+          /* Auto-wake on load (Overview is default tab) */
           petalTgt = 1;
           petalTmr = setTimeout(function () { petalTgt = 0; }, 4000);
 
@@ -730,6 +746,82 @@ ui <- navbarPage(
             $('.pdl-2').css('transform', 'translateY(' + (sy * 0.16) + 'px)');
             $('.pdl-3').css('transform', 'translateY(' + (sy * 0.28) + 'px)');
           });
+
+          /* ── Tab detection: petals only on Overview ── */
+          function onTabChange(label) {
+            var isOverview = (label === 'Overview');
+            petalEnabled = isOverview;
+            if (!isOverview) {
+              petalTgt = 0;
+              clearTimeout(petalTmr);
+            } else {
+              petalWake();
+            }
+          }
+          $(document).on('shown.bs.tab', 'a[data-toggle=\"tab\"]', function (e) {
+            onTabChange($(e.target).text().trim());
+          });
+
+          /* ── Background music ──────────────────────────────────────────
+             Chrome's autoplay policy only honours genuine user gestures:
+               wheel, click, mousedown, keydown, touchstart.
+             scroll and mousemove are NOT recognised — that is why the old
+             code was silent.  We now use the correct event set, show a
+             tiny non-intrusive hint, and remove everything once music
+             is playing.                                                  */
+          var blossomAudio = document.getElementById('blossom-audio');
+          if (blossomAudio) {
+            blossomAudio.volume = 0.4;
+            blossomAudio.loop   = true;
+
+            /* Build the subtle hint element via JS so no extra HTML is needed */
+            var aHint = document.createElement('div');
+            aHint.id        = 'audio-hint';
+            aHint.innerHTML = '&#9834;&nbsp;scroll to play';
+            document.body.appendChild(aHint);
+
+            var audioPlaying = false;
+            /* Events Chrome actually counts as user gestures for media */
+            var audioEvts = ['wheel','click','mousedown','keydown','touchstart'];
+
+            function tryPlayAudio() {
+              if (audioPlaying) return;
+              blossomAudio.play()
+                .then(function () {
+                  audioPlaying = true;
+                  /* clean up every listener */
+                  audioEvts.forEach(function (ev) {
+                    document.removeEventListener(ev, tryPlayAudio, true);
+                  });
+                  /* fade-out and remove the hint */
+                  aHint.style.opacity = '0';
+                  setTimeout(function () {
+                    if (aHint.parentNode) aHint.parentNode.removeChild(aHint);
+                  }, 1200);
+                })
+                .catch(function () {
+                  /* Still blocked (very locked-down browser) — tell user to click */
+                  if (!audioPlaying) aHint.textContent = '\u266a click anywhere for music';
+                });
+            }
+
+            /* Attach to every recognised-gesture event */
+            audioEvts.forEach(function (ev) {
+              document.addEventListener(ev, tryPlayAudio, { capture: true, passive: true });
+            });
+
+            /* Also attempt immediate play — works when the browser has granted
+               autoplay permission for the domain (high Media-Engagement Index) */
+            blossomAudio.play()
+              .then(function () {
+                audioPlaying = true;
+                aHint.style.display = 'none';
+                audioEvts.forEach(function (ev) {
+                  document.removeEventListener(ev, tryPlayAudio, true);
+                });
+              })
+              .catch(function () { /* expected — hint is already visible */ });
+          }
 
         });
       "))
@@ -905,6 +997,15 @@ ui <- navbarPage(
           "DATA 557 \u00B7 Faculty Salary Analysis \u00B7 University of Washington"
         )
       )
+    ),
+
+    # Hidden background audio — persists across all tabs, autoplays on first interaction
+    tags$audio(
+      id      = "blossom-audio",
+      loop    = NA,
+      preload = "auto",
+      style   = "display:none;",
+      tags$source(src = "c_blossoms.mp3", type = "audio/mpeg")
     )
   ),
 
@@ -1006,10 +1107,10 @@ ui <- navbarPage(
   ),
 
   # ══════════════════════════════════════════════════
-  #  Q4: Career Arc (NEW)
+  #  Career Trajectories
   # ══════════════════════════════════════════════════
   tabPanel(
-    "Q4: Career Arc",
+    "Career Trajectories",
     fluidPage(
       sidebarLayout(
         sidebarPanel(
