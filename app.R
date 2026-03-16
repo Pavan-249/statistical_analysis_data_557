@@ -2,6 +2,9 @@
 library(shiny)
 library(tidyverse)
 library(scales)
+library(lmtest)
+library(sandwich)
+library(plotly)
 
 #-------------------------------
 # Data loading & preparation
@@ -31,7 +34,8 @@ salary_clean <- salary %>%
 sex_colours <- c("M" = "#4472C4", "F" = "#E05C5C")
 
 start_salary <- salary_clean %>%
-  filter(year == startyr)
+  filter(year == startyr) %>%
+  mutate(log_salary = log(salary))
 promotion_data <- salary_clean %>%
   arrange(id, year) %>%
   group_by(id) %>%
@@ -49,6 +53,35 @@ promotion_data <- salary_clean %>%
     raise_amount = salary - prev_salary,
     raise_pct    = (salary - prev_salary) / prev_salary
   )
+ever_assoc_ids <- salary_clean %>%
+  group_by(id) %>%
+  filter(any(rank == "Assoc")) %>%
+  pull(id) %>%
+  unique()
+
+person_level <- salary_clean %>%
+  filter(id %in% ever_assoc_ids) %>%
+  arrange(id, year) %>%
+  group_by(id) %>%
+  summarise(
+    sex            = first(sex),
+    deg            = first(deg),
+    field          = first(field),
+    yrdeg          = first(yrdeg),
+    promoted       = as.integer(any(rank == "Full")),
+    yr_first_assoc = min(year[rank == "Assoc"], na.rm = TRUE),
+    yr_first_full  = ifelse(any(rank == "Full"),
+                            min(year[rank == "Full"], na.rm = TRUE), NA_real_),
+    yrs_as_assoc   = ifelse(any(rank == "Full"),
+                            yr_first_full - yr_first_assoc, NA_real_),
+    sal_assoc_entry = salary[rank == "Assoc"][which.min(year[rank == "Assoc"])],
+    sal_assoc_last  = salary[rank == "Assoc"][which.max(year[rank == "Assoc"])],
+    sal_full_entry  = ifelse(any(rank == "Full"),
+                             salary[rank == "Full"][which.min(year[rank == "Full"])],
+                             NA_real_),
+    .groups = "drop"
+  )
+
 latest_salary <- salary_clean %>%
   arrange(id, year) %>%
   group_by(id) %>%
@@ -1032,6 +1065,12 @@ ui <- navbarPage(
         ),
 
         div(class = "cherry-footer",
+          tags$img(
+            src    = "University-of-Washington-Logo.png",
+            alt    = "University of Washington",
+            height = "36px",
+            style  = "opacity:0.55; filter:brightness(0) invert(1); margin-bottom:8px; display:block; margin-left:auto; margin-right:auto;"
+          ),
           "DATA 557 \u00B7 Faculty Salary Analysis \u00B7 University of Washington"
         )
       )
@@ -1048,6 +1087,45 @@ ui <- navbarPage(
   ),
 
   # ══════════════════════════════════════════════════
+  #  Explore Data (EDA — NEW)
+  # ══════════════════════════════════════════════════
+  tabPanel(
+    "Explore Data",
+    fluidPage(
+      sidebarLayout(
+        sidebarPanel(
+          width = 3,
+          h4("Filter by Sex"),
+          radioButtons(
+            "eda_sex", label = NULL,
+            choices  = c("Both" = "Both", "Male only" = "M", "Female only" = "F"),
+            selected = "Both"
+          ),
+          hr(),
+          helpText("Choose Both to compare groups side by side, or focus on one group.
+                    Hover on any chart for exact values.")
+        ),
+        mainPanel(
+          width = 9,
+          h3("Exploratory Data Analysis"),
+          p(style = "color:#666; margin-bottom:1.2em;",
+            "Before formal tests, we look at the shape of the data: record counts by sex,
+            how average salary changed over two decades, and how salary varies across
+            academic rank. These patterns motivate the controls used in later analyses."),
+          fluidRow(
+            column(6, plotlyOutput("eda_obs_by_sex",    height = "320px")),
+            column(6, plotlyOutput("eda_salary_time",   height = "320px"))
+          ),
+          br(),
+          fluidRow(
+            column(12, plotlyOutput("eda_salary_rank",  height = "340px"))
+          )
+        )
+      )
+    )
+  ),
+
+  # ══════════════════════════════════════════════════
   #  Q1: Starting Salary (logic unchanged)
   # ══════════════════════════════════════════════════
   tabPanel(
@@ -1055,26 +1133,47 @@ ui <- navbarPage(
     fluidPage(
       sidebarLayout(
         sidebarPanel(
+          width = 3,
           h4("Controls"),
           selectInput(
             "q1_field", "Field (discipline):",
             choices = c("All", sort(unique(start_salary$field))), selected = "All"
           ),
-          checkboxGroupInput(
+          radioButtons(
             "q1_sex", "Sex:",
-            choices = levels(start_salary$sex), selected = levels(start_salary$sex)
-          ),
-          width = 3
+            choices  = c("Both" = "Both", "Male only" = "M", "Female only" = "F"),
+            selected = "Both"
+          )
         ),
         mainPanel(
-          h4("Starting Salary by Sex"),
-          plotOutput("q1_box_sex", height = "300px"),
-          br(),
-          h4("Starting Salary by Hire Year and Sex"),
-          plotOutput("q1_box_year", height = "300px"),
-          br(),
-          h4("Starting Salary Summary Table"),
-          tableOutput("q1_summary_tbl")
+          width = 9,
+          tabsetPanel(
+            tabPanel("Distributions",
+              br(),
+              fluidRow(
+                column(6, plotlyOutput("q1_hist_sex",      height = "300px")),
+                column(6, plotlyOutput("q1_box_field",     height = "300px"))
+              ),
+              br(),
+              fluidRow(
+                column(12, plotlyOutput("q1_box_rank_field", height = "340px"))
+              ),
+              br(),
+              h4("Starting Salary Summary Table"),
+              tableOutput("q1_summary_tbl")
+            ),
+            tabPanel("Tests & Regression",
+              br(),
+              h5("Welch t-test (difference in mean starting salary by sex)"),
+              verbatimTextOutput("q1_ttest"),
+              hr(),
+              h5("Regression controlling for rank, field, degree year and hire year"),
+              verbatimTextOutput("q1_lm_out"),
+              hr(),
+              h5("Log-salary model with robust SE (coefficient for sex approximates percent difference)"),
+              verbatimTextOutput("q1_lm_log_robust")
+            )
+          )
         )
       )
     )
@@ -1088,24 +1187,55 @@ ui <- navbarPage(
     fluidPage(
       sidebarLayout(
         sidebarPanel(
+          width = 3,
           h4("Controls"),
-          checkboxGroupInput(
-            "q2_sex", "Sex:",
-            choices = levels(promotion_data$sex), selected = levels(promotion_data$sex)
-          ),
           radioButtons(
-            "q2_metric", "Raise metric:",
-            choices = c("Dollar raise" = "amount", "Percent raise" = "percent"),
-            selected = "amount"
+            "q2_sex", "Sex:",
+            choices  = c("Both" = "Both", "Male only" = "M", "Female only" = "F"),
+            selected = "Both"
           ),
-          width = 3
+          hr(),
+          helpText("Tests and regression models always use the full dataset regardless of the sex filter.")
         ),
         mainPanel(
-          h4("Salary Increase at Promotion (Associate \u2192 Full)"),
-          plotOutput("q2_box", height = "300px"),
-          br(),
-          h4("Summary by Sex"),
-          tableOutput("q2_summary_tbl")
+          width = 9,
+          tabsetPanel(
+            tabPanel("Raise by Sex",
+              br(),
+              plotlyOutput("q2_raise_box", height = "340px"),
+              br(),
+              h5("Summary by Sex"),
+              tableOutput("q2_summary_tbl")
+            ),
+            tabPanel("Tests",
+              br(),
+              h5("Welch t-test (dollar raise)"),
+              verbatimTextOutput("q2_ttest_dollar"),
+              hr(),
+              h5("Welch t-test (percent raise)"),
+              verbatimTextOutput("q2_ttest_pct"),
+              hr(),
+              h5("Wilcoxon rank-sum (percent raise)"),
+              verbatimTextOutput("q2_wilcox")
+            ),
+            tabPanel("Regression",
+              br(),
+              h5("Dollar raise modeled by sex, field, degree year and pre-promotion salary (robust SE)"),
+              verbatimTextOutput("q2_lm_raise"),
+              hr(),
+              h5("Percent raise with same predictors (robust SE)"),
+              verbatimTextOutput("q2_lm_pct")
+            ),
+            tabPanel("Promotion Rates",
+              br(),
+              p(style = "color:#666;",
+                "Among those who were ever Associate Professors, the share who were later promoted to Full:"),
+              tableOutput("q2_promotion_rates"),
+              hr(),
+              h5("Chi-squared test of independence (sex vs promotion)"),
+              verbatimTextOutput("q2_prop_test")
+            )
+          )
         )
       )
     )
@@ -1119,26 +1249,46 @@ ui <- navbarPage(
     fluidPage(
       sidebarLayout(
         sidebarPanel(
+          width = 3,
           h4("Controls"),
           checkboxGroupInput(
             "q3_rank", "Rank:",
             choices = levels(latest_salary$rank), selected = levels(latest_salary$rank)
           ),
-          checkboxGroupInput(
+          radioButtons(
             "q3_sex", "Sex:",
-            choices = levels(latest_salary$sex), selected = levels(latest_salary$sex)
+            choices  = c("Both" = "Both", "Male only" = "M", "Female only" = "F"),
+            selected = "Both"
           ),
-          width = 3
+          hr(),
+          helpText("Regression models always use the full dataset; the filter applies to the charts only.")
         ),
         mainPanel(
-          h4("Latest Salary by Sex Within Rank"),
-          plotOutput("q3_box_rank", height = "300px"),
-          br(),
-          h4("Latest Salary Density by Sex Within Rank"),
-          plotOutput("q3_density_rank", height = "300px"),
-          br(),
-          h4("Summary Table"),
-          tableOutput("q3_summary_tbl")
+          width = 9,
+          tabsetPanel(
+            tabPanel("Charts",
+              br(),
+              h5("Latest Salary by Sex Within Rank"),
+              plotOutput("q3_box_rank",     height = "300px"),
+              br(),
+              h5("Latest Salary Density by Sex Within Rank"),
+              plotOutput("q3_density_rank", height = "300px"),
+              br(),
+              h5("Summary Table"),
+              tableOutput("q3_summary_tbl")
+            ),
+            tabPanel("Regression Models",
+              br(),
+              h5("Baseline model: salary by sex, rank, field, experience, admin role (robust SE)"),
+              verbatimTextOutput("q3_lm_robust"),
+              hr(),
+              h5("Log-salary model: coefficient for sex approximates a percent difference (robust SE)"),
+              verbatimTextOutput("q3_lm_log_robust"),
+              hr(),
+              h5("Log-salary with sex by admin interaction: gap for non-admin vs admin (robust SE)"),
+              verbatimTextOutput("q3_lm_interaction_robust")
+            )
+          )
         )
       )
     )
@@ -1157,9 +1307,10 @@ ui <- navbarPage(
             "q4_field", "Field:",
             choices = c("All", sort(unique(salary_arc$field))), selected = "All"
           ),
-          checkboxGroupInput(
+          radioButtons(
             "q4_sex", "Sex:",
-            choices = levels(salary_arc$sex), selected = levels(salary_arc$sex)
+            choices  = c("Both" = "Both", "Male only" = "M", "Female only" = "F"),
+            selected = "Both"
           ),
           hr(),
           helpText(
@@ -1234,28 +1385,52 @@ server <- function(input, output, session) {
     salary_clean %>% count(field, sort = TRUE)
   })
 
+  # ── Helper: filter by sex radio (Both / M / F) ──
+  filter_sex <- function(df, input_val) {
+    if (!is.null(input_val) && input_val != "Both")
+      df <- df %>% filter(sex == input_val)
+    df
+  }
+
   # ── Q1: Starting Salary ──
   q1_filtered <- reactive({
     dat <- start_salary
     if (input$q1_field != "All")
       dat <- dat %>% filter(field == input$q1_field)
-    if (length(input$q1_sex) > 0)
-      dat <- dat %>% filter(sex %in% input$q1_sex)
-    dat
+    filter_sex(dat, input$q1_sex)
   })
-  output$q1_box_sex <- renderPlot({
-    ggplot(q1_filtered(), aes(x = sex, y = salary, fill = sex)) +
+  # Q1 plotly charts
+  output$q1_hist_sex <- renderPlotly({
+    d <- q1_filtered()
+    if (nrow(d) == 0) return(plotly_empty())
+    p <- ggplot(d, aes(x = salary, fill = sex)) +
+      geom_histogram(alpha = 0.8, bins = 25, position = "identity") +
+      scale_fill_manual(values = sex_colours, drop = TRUE) +
+      facet_wrap(~ sex, scales = "free_y") +
+      labs(title = "Starting Salary Distribution by Sex", x = "Starting Salary", y = "Count") +
+      theme_minimal()
+    ggplotly(p)
+  })
+  output$q1_box_field <- renderPlotly({
+    d <- q1_filtered()
+    if (nrow(d) == 0) return(plotly_empty())
+    p <- ggplot(d, aes(x = field, y = salary, fill = sex)) +
+      geom_boxplot(alpha = 0.8, position = position_dodge(width = 0.75)) +
+      scale_fill_manual(values = sex_colours, drop = TRUE) +
+      labs(title = "Starting Salary by Field and Sex", x = "Academic Field", y = "Starting Salary") +
+      theme_minimal()
+    ggplotly(p)
+  })
+  output$q1_box_rank_field <- renderPlotly({
+    d <- q1_filtered()
+    if (nrow(d) == 0) return(plotly_empty())
+    p <- ggplot(d, aes(x = sex, y = salary, fill = sex)) +
       geom_boxplot(alpha = 0.8) +
-      scale_fill_manual(values = sex_colours) +
-      labs(x = "Sex", y = "Starting salary", title = "Starting Salary by Sex")
-  })
-  output$q1_box_year <- renderPlot({
-    ggplot(q1_filtered(), aes(x = factor(startyr), y = salary, fill = sex)) +
-      geom_boxplot(outlier.alpha = 0.3) +
-      scale_fill_manual(values = sex_colours) +
-      labs(x = "Hire year", y = "Starting salary",
-           title = "Starting Salary by Hire Year and Sex") +
-      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+      scale_fill_manual(values = sex_colours, drop = TRUE) +
+      facet_grid(rank ~ field) +
+      labs(title = "Starting Salary by Sex, Rank, and Field", x = "Sex", y = "Starting Salary") +
+      theme_minimal()
+    ggplotly(p)
   })
   output$q1_summary_tbl <- renderTable({
     q1_filtered() %>%
@@ -1268,30 +1443,43 @@ server <- function(input, output, session) {
         .groups = "drop"
       )
   })
+  # Q1 statistical tests
+  output$q1_ttest <- renderPrint({
+    t.test(salary ~ sex, data = start_salary)
+  })
+  q1_lm_mdl <- reactive({
+    lm(salary ~ sex + rank + field + yrdeg + startyr, data = start_salary)
+  })
+  output$q1_lm_out <- renderPrint({
+    summary(q1_lm_mdl())
+  })
+  q1_lm_log_mdl <- reactive({
+    lm(log_salary ~ sex + rank + field + yrdeg + startyr, data = start_salary)
+  })
+  output$q1_lm_log_robust <- renderPrint({
+    coeftest(q1_lm_log_mdl(), vcov = vcovHC(q1_lm_log_mdl(), type = "HC1"))
+  })
 
   # ── Q2: Promotion Raises ──
   q2_filtered <- reactive({
-    dat <- promotion_data
-    if (length(input$q2_sex) > 0)
-      dat <- dat %>% filter(sex %in% input$q2_sex)
-    dat
+    filter_sex(promotion_data, input$q2_sex)
   })
-  output$q2_box <- renderPlot({
-    dat <- q2_filtered()
-    if (input$q2_metric == "amount") {
-      ggplot(dat, aes(x = sex, y = raise_amount, fill = sex)) +
-        geom_boxplot(alpha = 0.8) +
-        scale_fill_manual(values = sex_colours) +
-        labs(x = "Sex", y = "Dollar raise at promotion",
-             title = "Salary Increase at Promotion (Associate to Full) by Sex")
-    } else {
-      ggplot(dat, aes(x = sex, y = raise_pct, fill = sex)) +
-        geom_boxplot(alpha = 0.8) +
-        scale_fill_manual(values = sex_colours) +
-        scale_y_continuous(labels = percent_format(accuracy = 1)) +
-        labs(x = "Sex", y = "Percent raise at promotion",
-             title = "Percent Raise at Promotion by Sex")
-    }
+  output$q2_raise_box <- renderPlotly({
+    d <- q2_filtered()
+    if (nrow(d) == 0) return(plotly_empty())
+    promo_long <- d %>%
+      select(sex, raise_amount, raise_pct) %>%
+      pivot_longer(cols = c(raise_amount, raise_pct),
+                   names_to = "metric", values_to = "value")
+    p <- ggplot(promo_long, aes(x = sex, y = value, fill = sex)) +
+      geom_boxplot(alpha = 0.8) +
+      scale_fill_manual(values = sex_colours, drop = TRUE) +
+      facet_wrap(~ metric, scales = "free_y",
+                 labeller = as_labeller(c(raise_amount = "Dollar Raise",
+                                          raise_pct    = "Percent Raise"))) +
+      labs(title = "Raise at Promotion by Sex", x = "Sex", y = NULL) +
+      theme_minimal()
+    ggplotly(p)
   })
   output$q2_summary_tbl <- renderTable({
     q2_filtered() %>%
@@ -1305,15 +1493,51 @@ server <- function(input, output, session) {
         .groups = "drop"
       )
   })
+  # Q2 tests
+  output$q2_ttest_dollar <- renderPrint({
+    t.test(raise_amount ~ sex, data = promotion_data)
+  })
+  output$q2_ttest_pct <- renderPrint({
+    t.test(raise_pct ~ sex, data = promotion_data)
+  })
+  output$q2_wilcox <- renderPrint({
+    wilcox.test(raise_pct ~ sex, data = promotion_data)
+  })
+  # Q2 regression
+  q2_lm_raise_mdl <- reactive({
+    lm(raise_amount ~ sex + field + yrdeg + prev_salary, data = promotion_data)
+  })
+  output$q2_lm_raise <- renderPrint({
+    coeftest(q2_lm_raise_mdl(), vcov = vcovHC(q2_lm_raise_mdl(), type = "HC1"))
+  })
+  q2_lm_pct_mdl <- reactive({
+    lm(raise_pct ~ sex + field + yrdeg + prev_salary, data = promotion_data)
+  })
+  output$q2_lm_pct <- renderPrint({
+    coeftest(q2_lm_pct_mdl(), vcov = vcovHC(q2_lm_pct_mdl(), type = "HC1"))
+  })
+  # Q2 promotion rates
+  output$q2_promotion_rates <- renderTable({
+    person_level %>%
+      group_by(sex) %>%
+      summarise(
+        n              = n(),
+        n_promoted     = sum(promoted),
+        promotion_rate = round(mean(promoted), 3),
+        .groups        = "drop"
+      )
+  })
+  output$q2_prop_test <- renderPrint({
+    ct <- table(person_level$sex, person_level$promoted)
+    chisq.test(ct, correct = FALSE)
+  })
 
   # ── Q3: Latest Salary ──
   q3_filtered <- reactive({
     dat <- latest_salary
     if (length(input$q3_rank) > 0)
       dat <- dat %>% filter(rank %in% input$q3_rank)
-    if (length(input$q3_sex) > 0)
-      dat <- dat %>% filter(sex %in% input$q3_sex)
-    dat
+    filter_sex(dat, input$q3_sex)
   })
   output$q3_box_rank <- renderPlot({
     ggplot(q3_filtered(), aes(x = sex, y = salary, fill = sex)) +
@@ -1343,14 +1567,70 @@ server <- function(input, output, session) {
       arrange(rank, sex)
   })
 
+  # Q3 regression models with robust SE
+  q3_lm_mdl <- reactive({
+    lm(salary ~ sex + rank + field + experience + admin, data = latest_salary)
+  })
+  output$q3_lm_robust <- renderPrint({
+    coeftest(q3_lm_mdl(), vcov = vcovHC(q3_lm_mdl(), type = "HC1"))
+  })
+  q3_lm_log_mdl <- reactive({
+    lm(log_salary ~ sex + rank + field + experience + admin, data = latest_salary)
+  })
+  output$q3_lm_log_robust <- renderPrint({
+    coeftest(q3_lm_log_mdl(), vcov = vcovHC(q3_lm_log_mdl(), type = "HC1"))
+  })
+  q3_lm_interaction_mdl <- reactive({
+    lm(log_salary ~ sex * admin + rank + field + experience, data = latest_salary)
+  })
+  output$q3_lm_interaction_robust <- renderPrint({
+    coeftest(q3_lm_interaction_mdl(), vcov = vcovHC(q3_lm_interaction_mdl(), type = "HC1"))
+  })
+
+  # ── EDA ──
+  output$eda_obs_by_sex <- renderPlotly({
+    d <- filter_sex(salary_clean, input$eda_sex)
+    if (nrow(d) == 0) return(plotly_empty())
+    p <- d %>%
+      count(sex) %>%
+      ggplot(aes(x = sex, y = n, fill = sex)) +
+      geom_col(width = 0.6) +
+      scale_fill_manual(values = sex_colours, drop = TRUE) +
+      labs(title = "Observations by Sex", x = "Sex", y = "Number of Records") +
+      theme_minimal()
+    ggplotly(p)
+  })
+  output$eda_salary_time <- renderPlotly({
+    d <- filter_sex(salary_clean, input$eda_sex)
+    if (nrow(d) == 0) return(plotly_empty())
+    p <- d %>%
+      group_by(year, sex) %>%
+      summarise(mean_salary = mean(salary), .groups = "drop") %>%
+      ggplot(aes(x = year, y = mean_salary, color = sex)) +
+      geom_line(linewidth = 1) +
+      scale_color_manual(values = sex_colours, drop = TRUE) +
+      labs(title = "Average Salary Over Time by Sex", x = "Year", y = "Average Salary") +
+      theme_minimal()
+    ggplotly(p)
+  })
+  output$eda_salary_rank <- renderPlotly({
+    d <- filter_sex(salary_clean, input$eda_sex)
+    if (nrow(d) == 0) return(plotly_empty())
+    p <- ggplot(d, aes(x = sex, y = salary, fill = sex)) +
+      geom_boxplot(alpha = 0.8) +
+      scale_fill_manual(values = sex_colours, drop = TRUE) +
+      facet_wrap(~ rank, scales = "free_y") +
+      labs(title = "Salary by Sex Within Rank", x = "Sex", y = "Monthly Salary") +
+      theme_minimal()
+    ggplotly(p)
+  })
+
   # ── Q4: Career Arc ──
   q4_filtered <- reactive({
     dat <- salary_arc
     if (input$q4_field != "All")
       dat <- dat %>% filter(field == input$q4_field)
-    if (length(input$q4_sex) > 0)
-      dat <- dat %>% filter(sex %in% input$q4_sex)
-    dat
+    filter_sex(dat, input$q4_sex)
   })
 
   # Dynamic insight banner: computes the actual early vs late salary ratio
